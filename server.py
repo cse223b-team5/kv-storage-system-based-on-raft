@@ -57,7 +57,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         # TODO: call a function to properly initialize these variables
 
         self.leaderIndex = 0
-        self.last_commit_history = dict() # client_id -> (serial_no, result)
+        self.last_commit_history = dict()  # client_id -> (serial_no, result)
         self.ae_succeed_cnt = 0
         self.apply_thread = None
 
@@ -125,12 +125,30 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         port = self.configs['node'][self.leaderIndex][1]
         return ip, port
 
+    def DEBUG_GetVariable(self, request):
+        response = storage_service_pb2.DEBUG_GetVariable_Response()
+        variable = response.variables.add()
+
+        if request.variable == 'matchIndex':
+            variable.value = str(self.matchIndex)
+        elif request.variable == 'nextIndex':
+            variable.value = str(self.nextIndex)
+        elif request.variable == 'log':
+            variable.value = str(self.storage)
+        elif request.variable == 'all':
+            variable.value = str(self.__dict__)
+        else:
+            variable.value = 'Invaid variable.'
+
+        return response
+
     def Get(self, request, context):
-        if self.check_is_leader():
+        if not self.check_is_leader():
             ip, port = self.get_leader_ip_port()
-            return storage_service_pb2.PutResponse(leader_ip=ip, leader_port=port, ret=1)
+            return storage_service_pb2.GetResponse(leader_ip=ip, leader_port=port, ret=1)
         # no need to sync entries
         self.heartbeat_once_to_all(False)
+        # this is a synchronous function call, return when heartbeats to all nodes have returned
         if self.check_is_leader() and request.key in self.storage:
             return storage_service_pb2.GetResponse(value=str(self.storage[request.key]), ret=0)
         else:
@@ -197,34 +215,32 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         return request, new_nextIndex
 
     def update_nextIndex_and_matchIndex(self, node_index, new_nextIndex):
-        # since you can't tell if the 'success' reply from AE is covered by any later AE, you need to
+        # since you can't tell if the 'success' reply from AE has already covered by any later AE, you need to
         # manually pass the new_nextIndex as arg to this function
         self.try_extend_nextIndex(node_index, new_nextIndex)
         # same case for matchIndex
         self.try_extend_matchIndex(node_index, new_nextIndex - 1)
 
-    def replicate_log_entries_to_one(self, ip, port, node_index):
+    def replicate_log_entries_to_one(self, ip, port, receiver_index):
         with grpc.insecure_channel(ip + ':' + port) as channel:
             stub = storage_service_pb2_grpc.KeyValueStoreStub(channel)
-            request, new_nextIndex = self.generate_append_entry_request(node_index)
+            request, new_nextIndex = self.generate_append_entry_request(receiver_index)
             try:
-                response = stub.AppendEntries(request, timeout=1)
+                response = stub.AppendEntries(request, timeout=self.configs['timeout'])
             except TimeoutError:
-                # TODO: once timeout we suppose it has failed?
+                self.logger.info('AppendEntries call to node #'+str(receiver_index)+' timed out.')
                 return
 
             if response.success:
                 self.increment_ae_succeed_cnt()
-                receiver_index = self.get_node_index_by_addr(ip,port)
                 self.update_nextIndex_and_matchIndex(receiver_index, new_nextIndex)
             elif response.failed_for_term:
                 # TODO: step down to follower
                 pass
             else:
                 # AppendEntries failed because of log inconsistency
-                receiver_index = self.get_node_index_by_addr(ip, port)
                 self.decrement_nextIndex(receiver_index)
-                self.replicate_log_entries_to_one(ip, port, node_index)
+                self.replicate_log_entries_to_one(ip, port, receiver_index)
 
     def replicate_log_entries_to_all(self):
         for ip_port_tuple, node_index in enumerate(self.configs['node']):
@@ -254,7 +270,6 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         while self.ae_succeed_cnt < majority_cnt:
             if not self.check_is_leader():
                 return storage_service_pb2.PutResponse(ret=1)
-                # TODO: is redirecting to actual leader necessary?
             continue
 
         if self.ae_succeed_cnt < majority_cnt:
@@ -310,6 +325,55 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         if not self.apply_thread:
             self.apply_thread = threading.Thread(target=self.apply, args=())
         self.apply_thread.start()
+        
+    def AppendEntries(self, request, context):
+        # 1
+        if request.term < self.currentTerm:
+            return storage_service_pb2.AppendEntriesResponse(term = self.currentTerm, success = False, failed_for_term = True) # present leader is not real leader
+
+        # 2
+        if len(self.log) - 1 < request.prevLogIndex or len(self.log) - 1 >= request.prevLogIndex and self.log_term[request.prevLogIndex] != request.prevLogTerm:
+            return storage_service_pb2.AppendEntriesResponse(term=self.currentTerm, success=False,
+                                                             failed_for_term=False)  # inconsistency
+
+        # TODO: step down to follower
+        # 3
+        i = len(self.log) - 1
+        while i > request.prevLogIndex:
+            self.log.pop(i)
+            i -= 1
+
+        # 4
+        for entry in request.entries:
+            self.log.append(entry)
+            self.log_term.append(request.term)
+
+        self.currentTerm = request.term
+
+        # 5
+        self.commitIndex = min(request.leaderCommit, len(self.log) - 1)
+
+        return storage_service_pb2.AppendEntriesResponse(term=self.currentTerm, success=True)
+
+
+    def RequestVote(self, request, context):
+        # 1
+        if request.term < self.currentTerm:
+            return storage_service_pb2.RequestVoteResponse(term=self.currentTerm, voteGranted=False)
+
+        # 2
+        if self.votedFor != None:
+            return storage_service_pb2.RequestVoteResponse(term=self.currentTerm, voteGranted=False)
+
+        #server的最新term是比较log_term的最后一个entry还是currentTerm；request.term = self.log_term[len(self.log)-1]的情况
+        if not (request.lastLogIndex > len(self.log) - 1 and request.term >= self.log_term[len(self.log)-1] \
+            or request.lastLogIndex <= len(self.log) - 1 and request.term > self.log_term[request.lastLogIndex]):
+            return storage_service_pb2.RequestVoteResponse(term=self.currentTerm, voteGranted=False)
+
+        # TODO: step down to follower
+        self.votedFor = request.candidateId
+        self.currentTerm = request.term # 存疑，是否应该加
+        return storage_service_pb2.RequestVoteResponse(term=self.currentTerm, voteGranted=True)
 
 
 class ChaosServer(chaosmonkey_pb2_grpc.ChaosMonkeyServicer):
