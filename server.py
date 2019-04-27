@@ -18,6 +18,7 @@ lock_ae_succeed_cnt = threading.Lock()
 lock_decrement_nextIndex = threading.Lock()
 lock_try_extend_nextIndex = threading.Lock()
 lock_try_extend_matchIndex = threading.Lock()
+lock_state_machine = threading.Lock()
 
 
 def synchronized(lock):
@@ -95,6 +96,10 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         if new_matchIndex > self.matchIndex[node_index]:
             self.matchIndex[node_index] = new_matchIndex
 
+    @synchronized(lock_state_machine)
+    def modify_state_machine(self, key, value):
+        self.storage[key] = value
+
     def generate_request_to(self, ip, port):
         request = storage_service_pb2.AppendEntriesRequest()
         request.term = self.currentTerm
@@ -146,7 +151,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
                 self.replicate_log_entries_to_one(ip, port)
 
     def replicate_log_entries_to_all(self):
-        for ip, port in self.configs['node']:
+        for ip, port in enumerate(self.configs['node']):
             ae_thread = threading.Thread(target=self.replicate_log_entries_to_one, args=(ip, port))
             ae_thread.start()
 
@@ -190,6 +195,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
             self.commitIndex = i
 
         # apply to state machine
+        self.modify_state_machine(request.key, request.value)
 
         # record in history
         self.last_commit_history[client_id] = (request.serial_no, True)
