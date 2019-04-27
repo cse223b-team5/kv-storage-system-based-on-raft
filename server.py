@@ -2,7 +2,6 @@ from concurrent import futures
 import time
 import sys
 import logging
-import random
 import threading
 import functools
 import grpc
@@ -13,7 +12,6 @@ import chaosmonkey_pb2_grpc
 from utils import load_config
 from chaos_server import ChaosServer
 from logging import Logger, StreamHandler, Formatter
-
 
 lock_append_log = threading.Lock()
 lock_ae_succeed_cnt = threading.Lock()
@@ -39,7 +37,7 @@ _ONE_DAY_IN_SECONDS = 60 * 60 * 24
 
 
 class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
-    def __init__(self, config_path, myIp, myPort):
+    def __init__(self, config_path, myIp, myPort, is_leader):
         self.configs = load_config(config_path)
         self.myIp = myIp
         self.myPort = myPort
@@ -63,8 +61,22 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         self.ae_succeed_cnt = 0
         self.apply_thread = None
 
+        self.is_leader = is_leader
+        self.init_states()
+
     def init_states(self):
-        self.revoke_apply_thread()
+        log_size = self.log
+        for i in range(len(self.configs)):
+            self.nextIndex.append = log_size
+            self.matchIndex.append(0)
+        if self.is_leader:
+            self.run_heartbeat_timer()
+        else:
+            self.revoke_apply_thread()
+
+    def run_heartbeat_timer(self):
+        self.heartbeat_timer = threading.Timer(self.configs['heartbeat_timeout'], self.heartbeat_once_to_all)
+        self.heartbeat_timer.start()
 
     @synchronized(lock_append_log)
     def append_to_local_log(self, key, value):
@@ -76,7 +88,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
 
     @synchronized(lock_decrement_nextIndex)
     def decrement_nextIndex(self, node_index):
-        self.node_index[node_index] -= 1
+        self.next_index[node_index] -= 1
 
     @synchronized(lock_try_extend_nextIndex)
     def try_extend_nextIndex(self, node_index, new_nextIndex):
@@ -166,7 +178,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
                 self.decrement_nextIndex(node_index)
                 self.heartbeat_once_to_one(ip, port, node_index)
 
-    def heartbeat_once_to_all(self, is_sync_entry):
+    def heartbeat_once_to_all(self, is_sync_entry=True):
         threads = []
         for ip_port_tuple, node_index in enumerate(self.configs['node']):
             ip = ip_port_tuple[0]
@@ -284,7 +296,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
                 break
             i += 1
         i -= 1  # i is the max number to have appeared for more than majority_cnt times
-        if self.log[i] == self.currentTerm and self.check_is_leader():
+        if self.check_is_leader():
             self.try_extend_commitIndex(i)
 
     def set_log(self):
@@ -313,6 +325,55 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         if not self.apply_thread:
             self.apply_thread = threading.Thread(target=self.apply, args=())
         self.apply_thread.start()
+        
+    def AppendEntries(self, request, context):
+        # 1
+        if request.term < self.currentTerm:
+            return storage_service_pb2.AppendEntriesResponse(term = self.currentTerm, success = False, failed_for_term = True) # present leader is not real leader
+
+        # 2
+        if len(self.log) - 1 < request.prevLogIndex or len(self.log) - 1 >= request.prevLogIndex and self.log_term[request.prevLogIndex] != request.prevLogTerm:
+            return storage_service_pb2.AppendEntriesResponse(term=self.currentTerm, success=False,
+                                                             failed_for_term=False)  # inconsistency
+
+        # TODO: step down to follower
+        # 3
+        i = len(self.log) - 1
+        while i > request.prevLogIndex:
+            self.log.pop(i)
+            i -= 1
+
+        # 4
+        for entry in request.entries:
+            self.log.append(entry)
+            self.log_term.append(request.term)
+
+        self.currentTerm = request.term
+
+        # 5
+        self.commitIndex = min(request.leaderCommit, len(self.log) - 1)
+
+        return storage_service_pb2.AppendEntriesResponse(term=self.currentTerm, success=True)
+
+
+    def RequestVote(self, request, context):
+        # 1
+        if request.term < self.currentTerm:
+            return storage_service_pb2.RequestVoteResponse(term=self.currentTerm, voteGranted=False)
+
+        # 2
+        if self.votedFor != None:
+            return storage_service_pb2.RequestVoteResponse(term=self.currentTerm, voteGranted=False)
+
+        #server的最新term是比较log_term的最后一个entry还是currentTerm；request.term = self.log_term[len(self.log)-1]的情况
+        if not (request.lastLogIndex > len(self.log) - 1 and request.term >= self.log_term[len(self.log)-1] \
+            or request.lastLogIndex <= len(self.log) - 1 and request.term > self.log_term[request.lastLogIndex]):
+            return storage_service_pb2.RequestVoteResponse(term=self.currentTerm, voteGranted=False)
+
+        # TODO: step down to follower
+        self.votedFor = request.candidateId
+        self.currentTerm = request.term # 存疑，是否应该加
+        return storage_service_pb2.RequestVoteResponse(term=self.currentTerm, voteGranted=True)
 
 
 class ChaosServer(chaosmonkey_pb2_grpc.ChaosMonkeyServicer):
