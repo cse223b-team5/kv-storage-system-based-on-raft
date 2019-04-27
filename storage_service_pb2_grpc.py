@@ -34,6 +34,11 @@ class KeyValueStoreStub(object):
         request_serializer=storage__service__pb2.RequestVoteRequest.SerializeToString,
         response_deserializer=storage__service__pb2.RequestVoteResponse.FromString,
         )
+    self.DEBUG_GetVariable = channel.unary_unary(
+        '/kvstore.KeyValueStore/DEBUG_GetVariable',
+        request_serializer=storage__service__pb2.DEBUG_GetVariable_Resquest.SerializeToString,
+        response_deserializer=storage__service__pb2.DEBUG_GetVariable_Response.FromString,
+        )
 
 
 class KeyValueStoreServicer(object):
@@ -68,6 +73,13 @@ class KeyValueStoreServicer(object):
     context.set_details('Method not implemented!')
     raise NotImplementedError('Method not implemented!')
 
+  def DEBUG_GetVariable(self, request, context):
+    # missing associated documentation comment in .proto file
+    pass
+    context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+    context.set_details('Method not implemented!')
+    raise NotImplementedError('Method not implemented!')
+
 
 def add_KeyValueStoreServicer_to_server(servicer, server):
   rpc_method_handlers = {
@@ -90,6 +102,11 @@ def add_KeyValueStoreServicer_to_server(servicer, server):
           servicer.RequestVote,
           request_deserializer=storage__service__pb2.RequestVoteRequest.FromString,
           response_serializer=storage__service__pb2.RequestVoteResponse.SerializeToString,
+      ),
+      'DEBUG_GetVariable': grpc.unary_unary_rpc_method_handler(
+          servicer.DEBUG_GetVariable,
+          request_deserializer=storage__service__pb2.DEBUG_GetVariable_Resquest.FromString,
+          response_serializer=storage__service__pb2.DEBUG_GetVariable_Response.SerializeToString,
       ),
   }
   generic_handler = grpc.method_handlers_generic_handler(

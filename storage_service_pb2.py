@@ -20,7 +20,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   package='kvstore',
   syntax='proto3',
   serialized_options=None,
-  serialized_pb=_b('\n\x15storage_service.proto\x12\x07kvstore\"\x19\n\nGetRequest\x12\x0b\n\x03key\x18\x01 \x01(\t\">\n\x0bGetResponse\x12\r\n\x05value\x18\x01 \x01(\t\x12 \n\x03ret\x18\x02 \x01(\x0e\x32\x13.kvstore.ReturnCode\"(\n\nPutRequest\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t\"/\n\x0bPutResponse\x12 \n\x03ret\x18\x01 \x01(\x0e\x32\x13.kvstore.ReturnCode\"\xd2\x01\n\x14\x41ppendEntriesRequest\x12\x0c\n\x04term\x18\x01 \x01(\x05\x12\x10\n\x08leaderId\x18\x02 \x01(\x05\x12\x14\n\x0cprevLogIndex\x18\x03 \x01(\x05\x12\x13\n\x0bprevLogTerm\x18\x04 \x01(\x05\x12\x34\n\x07\x65ntries\x18\x05 \x03(\x0b\x32#.kvstore.AppendEntriesRequest.entry\x12\x14\n\x0cleaderCommit\x18\x06 \x01(\x05\x1a#\n\x05\x65ntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t\"O\n\x15\x41ppendEntriesResponse\x12\x0c\n\x04term\x18\x01 \x01(\x05\x12\x0f\n\x07success\x18\x02 \x01(\x08\x12\x17\n\x0f\x66\x61iled_for_term\x18\x03 \x01(\x08\"b\n\x12RequestVoteRequest\x12\x0c\n\x04term\x18\x01 \x01(\x05\x12\x13\n\x0b\x63\x61ndidateId\x18\x02 \x01(\x05\x12\x14\n\x0clastLogIndex\x18\x03 \x01(\x05\x12\x13\n\x0blastLogTerm\x18\x04 \x01(\x05\"8\n\x13RequestVoteResponse\x12\x0c\n\x04term\x18\x01 \x01(\x05\x12\x13\n\x0bvoteGranted\x18\x02 \x01(\x08*&\n\nReturnCode\x12\x0b\n\x07SUCCESS\x10\x00\x12\x0b\n\x07\x46\x41ILURE\x10\x01\x32\x95\x02\n\rKeyValueStore\x12\x32\n\x03Get\x12\x13.kvstore.GetRequest\x1a\x14.kvstore.GetResponse\"\x00\x12\x32\n\x03Put\x12\x13.kvstore.PutRequest\x1a\x14.kvstore.PutResponse\"\x00\x12P\n\rAppendEntries\x12\x1d.kvstore.AppendEntriesRequest\x1a\x1e.kvstore.AppendEntriesResponse\"\x00\x12J\n\x0bRequestVote\x12\x1b.kvstore.RequestVoteRequest\x1a\x1c.kvstore.RequestVoteResponse\"\x00\x62\x06proto3')
+  serialized_pb=_b('\n\x15storage_service.proto\x12\x07kvstore\"\x19\n\nGetRequest\x12\x0b\n\x03key\x18\x01 \x01(\t\"f\n\x0bGetResponse\x12\r\n\x05value\x18\x01 \x01(\t\x12\x11\n\tleader_ip\x18\x02 \x01(\t\x12\x13\n\x0bleader_port\x18\x03 \x01(\t\x12 \n\x03ret\x18\x04 \x01(\x0e\x32\x13.kvstore.ReturnCode\";\n\nPutRequest\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t\x12\x11\n\tserial_no\x18\x03 \x01(\t\"W\n\x0bPutResponse\x12 \n\x03ret\x18\x01 \x01(\x0e\x32\x13.kvstore.ReturnCode\x12\x11\n\tleader_ip\x18\x02 \x01(\t\x12\x13\n\x0bleader_port\x18\x03 \x01(\t\"\xd2\x01\n\x14\x41ppendEntriesRequest\x12\x0c\n\x04term\x18\x01 \x01(\x05\x12\x10\n\x08leaderId\x18\x02 \x01(\x05\x12\x14\n\x0cprevLogIndex\x18\x03 \x01(\x05\x12\x13\n\x0bprevLogTerm\x18\x04 \x01(\x05\x12\x34\n\x07\x65ntries\x18\x05 \x03(\x0b\x32#.kvstore.AppendEntriesRequest.Entry\x12\x14\n\x0cleaderCommit\x18\x06 \x01(\x05\x1a#\n\x05\x45ntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t\"O\n\x15\x41ppendEntriesResponse\x12\x0c\n\x04term\x18\x01 \x01(\x05\x12\x0f\n\x07success\x18\x02 \x01(\x08\x12\x17\n\x0f\x66\x61iled_for_term\x18\x03 \x01(\x08\"b\n\x12RequestVoteRequest\x12\x0c\n\x04term\x18\x01 \x01(\x05\x12\x13\n\x0b\x63\x61ndidateId\x18\x02 \x01(\x05\x12\x14\n\x0clastLogIndex\x18\x03 \x01(\x05\x12\x13\n\x0blastLogTerm\x18\x04 \x01(\x05\"8\n\x13RequestVoteResponse\x12\x0c\n\x04term\x18\x01 \x01(\x05\x12\x13\n\x0bvoteGranted\x18\x02 \x01(\x08\".\n\x1a\x44\x45\x42UG_GetVariable_Resquest\x12\x10\n\x08variable\x18\x01 \x01(\t\"+\n\x1a\x44\x45\x42UG_GetVariable_Response\x12\r\n\x05value\x18\x01 \x01(\t*&\n\nReturnCode\x12\x0b\n\x07SUCCESS\x10\x00\x12\x0b\n\x07\x46\x41ILURE\x10\x01\x32\xf6\x02\n\rKeyValueStore\x12\x32\n\x03Get\x12\x13.kvstore.GetRequest\x1a\x14.kvstore.GetResponse\"\x00\x12\x32\n\x03Put\x12\x13.kvstore.PutRequest\x1a\x14.kvstore.PutResponse\"\x00\x12P\n\rAppendEntries\x12\x1d.kvstore.AppendEntriesRequest\x1a\x1e.kvstore.AppendEntriesResponse\"\x00\x12J\n\x0bRequestVote\x12\x1b.kvstore.RequestVoteRequest\x1a\x1c.kvstore.RequestVoteResponse\"\x00\x12_\n\x11\x44\x45\x42UG_GetVariable\x12#.kvstore.DEBUG_GetVariable_Resquest\x1a#.kvstore.DEBUG_GetVariable_Response\"\x00\x62\x06proto3')
 )
 
 _RETURNCODE = _descriptor.EnumDescriptor(
@@ -40,8 +40,8 @@ _RETURNCODE = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=668,
-  serialized_end=706,
+  serialized_start=860,
+  serialized_end=898,
 )
 _sym_db.RegisterEnumDescriptor(_RETURNCODE)
 
@@ -97,8 +97,22 @@ _GETRESPONSE = _descriptor.Descriptor(
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
-      name='ret', full_name='kvstore.GetResponse.ret', index=1,
-      number=2, type=14, cpp_type=8, label=1,
+      name='leader_ip', full_name='kvstore.GetResponse.leader_ip', index=1,
+      number=2, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR),
+    _descriptor.FieldDescriptor(
+      name='leader_port', full_name='kvstore.GetResponse.leader_port', index=2,
+      number=3, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR),
+    _descriptor.FieldDescriptor(
+      name='ret', full_name='kvstore.GetResponse.ret', index=3,
+      number=4, type=14, cpp_type=8, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
@@ -116,7 +130,7 @@ _GETRESPONSE = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=61,
-  serialized_end=123,
+  serialized_end=163,
 )
 
 
@@ -141,6 +155,13 @@ _PUTREQUEST = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR),
+    _descriptor.FieldDescriptor(
+      name='serial_no', full_name='kvstore.PutRequest.serial_no', index=2,
+      number=3, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR),
   ],
   extensions=[
   ],
@@ -153,8 +174,8 @@ _PUTREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=125,
-  serialized_end=165,
+  serialized_start=165,
+  serialized_end=224,
 )
 
 
@@ -172,6 +193,20 @@ _PUTRESPONSE = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR),
+    _descriptor.FieldDescriptor(
+      name='leader_ip', full_name='kvstore.PutResponse.leader_ip', index=1,
+      number=2, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR),
+    _descriptor.FieldDescriptor(
+      name='leader_port', full_name='kvstore.PutResponse.leader_port', index=2,
+      number=3, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR),
   ],
   extensions=[
   ],
@@ -184,27 +219,27 @@ _PUTRESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=167,
-  serialized_end=214,
+  serialized_start=226,
+  serialized_end=313,
 )
 
 
 _APPENDENTRIESREQUEST_ENTRY = _descriptor.Descriptor(
-  name='entry',
-  full_name='kvstore.AppendEntriesRequest.entry',
+  name='Entry',
+  full_name='kvstore.AppendEntriesRequest.Entry',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   fields=[
     _descriptor.FieldDescriptor(
-      name='key', full_name='kvstore.AppendEntriesRequest.entry.key', index=0,
+      name='key', full_name='kvstore.AppendEntriesRequest.Entry.key', index=0,
       number=1, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
-      name='value', full_name='kvstore.AppendEntriesRequest.entry.value', index=1,
+      name='value', full_name='kvstore.AppendEntriesRequest.Entry.value', index=1,
       number=2, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
@@ -222,8 +257,8 @@ _APPENDENTRIESREQUEST_ENTRY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=392,
-  serialized_end=427,
+  serialized_start=491,
+  serialized_end=526,
 )
 
 _APPENDENTRIESREQUEST = _descriptor.Descriptor(
@@ -287,8 +322,8 @@ _APPENDENTRIESREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=217,
-  serialized_end=427,
+  serialized_start=316,
+  serialized_end=526,
 )
 
 
@@ -332,8 +367,8 @@ _APPENDENTRIESRESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=429,
-  serialized_end=508,
+  serialized_start=528,
+  serialized_end=607,
 )
 
 
@@ -384,8 +419,8 @@ _REQUESTVOTEREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=510,
-  serialized_end=608,
+  serialized_start=609,
+  serialized_end=707,
 )
 
 
@@ -422,8 +457,70 @@ _REQUESTVOTERESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=610,
-  serialized_end=666,
+  serialized_start=709,
+  serialized_end=765,
+)
+
+
+_DEBUG_GETVARIABLE_RESQUEST = _descriptor.Descriptor(
+  name='DEBUG_GetVariable_Resquest',
+  full_name='kvstore.DEBUG_GetVariable_Resquest',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='variable', full_name='kvstore.DEBUG_GetVariable_Resquest.variable', index=0,
+      number=1, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=767,
+  serialized_end=813,
+)
+
+
+_DEBUG_GETVARIABLE_RESPONSE = _descriptor.Descriptor(
+  name='DEBUG_GetVariable_Response',
+  full_name='kvstore.DEBUG_GetVariable_Response',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='value', full_name='kvstore.DEBUG_GetVariable_Response.value', index=0,
+      number=1, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=815,
+  serialized_end=858,
 )
 
 _GETRESPONSE.fields_by_name['ret'].enum_type = _RETURNCODE
@@ -438,6 +535,8 @@ DESCRIPTOR.message_types_by_name['AppendEntriesRequest'] = _APPENDENTRIESREQUEST
 DESCRIPTOR.message_types_by_name['AppendEntriesResponse'] = _APPENDENTRIESRESPONSE
 DESCRIPTOR.message_types_by_name['RequestVoteRequest'] = _REQUESTVOTEREQUEST
 DESCRIPTOR.message_types_by_name['RequestVoteResponse'] = _REQUESTVOTERESPONSE
+DESCRIPTOR.message_types_by_name['DEBUG_GetVariable_Resquest'] = _DEBUG_GETVARIABLE_RESQUEST
+DESCRIPTOR.message_types_by_name['DEBUG_GetVariable_Response'] = _DEBUG_GETVARIABLE_RESPONSE
 DESCRIPTOR.enum_types_by_name['ReturnCode'] = _RETURNCODE
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
@@ -471,10 +570,10 @@ _sym_db.RegisterMessage(PutResponse)
 
 AppendEntriesRequest = _reflection.GeneratedProtocolMessageType('AppendEntriesRequest', (_message.Message,), dict(
 
-  entry = _reflection.GeneratedProtocolMessageType('entry', (_message.Message,), dict(
+  Entry = _reflection.GeneratedProtocolMessageType('Entry', (_message.Message,), dict(
     DESCRIPTOR = _APPENDENTRIESREQUEST_ENTRY,
     __module__ = 'storage_service_pb2'
-    # @@protoc_insertion_point(class_scope:kvstore.AppendEntriesRequest.entry)
+    # @@protoc_insertion_point(class_scope:kvstore.AppendEntriesRequest.Entry)
     ))
   ,
   DESCRIPTOR = _APPENDENTRIESREQUEST,
@@ -482,7 +581,7 @@ AppendEntriesRequest = _reflection.GeneratedProtocolMessageType('AppendEntriesRe
   # @@protoc_insertion_point(class_scope:kvstore.AppendEntriesRequest)
   ))
 _sym_db.RegisterMessage(AppendEntriesRequest)
-_sym_db.RegisterMessage(AppendEntriesRequest.entry)
+_sym_db.RegisterMessage(AppendEntriesRequest.Entry)
 
 AppendEntriesResponse = _reflection.GeneratedProtocolMessageType('AppendEntriesResponse', (_message.Message,), dict(
   DESCRIPTOR = _APPENDENTRIESRESPONSE,
@@ -505,6 +604,20 @@ RequestVoteResponse = _reflection.GeneratedProtocolMessageType('RequestVoteRespo
   ))
 _sym_db.RegisterMessage(RequestVoteResponse)
 
+DEBUG_GetVariable_Resquest = _reflection.GeneratedProtocolMessageType('DEBUG_GetVariable_Resquest', (_message.Message,), dict(
+  DESCRIPTOR = _DEBUG_GETVARIABLE_RESQUEST,
+  __module__ = 'storage_service_pb2'
+  # @@protoc_insertion_point(class_scope:kvstore.DEBUG_GetVariable_Resquest)
+  ))
+_sym_db.RegisterMessage(DEBUG_GetVariable_Resquest)
+
+DEBUG_GetVariable_Response = _reflection.GeneratedProtocolMessageType('DEBUG_GetVariable_Response', (_message.Message,), dict(
+  DESCRIPTOR = _DEBUG_GETVARIABLE_RESPONSE,
+  __module__ = 'storage_service_pb2'
+  # @@protoc_insertion_point(class_scope:kvstore.DEBUG_GetVariable_Response)
+  ))
+_sym_db.RegisterMessage(DEBUG_GetVariable_Response)
+
 
 
 _KEYVALUESTORE = _descriptor.ServiceDescriptor(
@@ -513,8 +626,8 @@ _KEYVALUESTORE = _descriptor.ServiceDescriptor(
   file=DESCRIPTOR,
   index=0,
   serialized_options=None,
-  serialized_start=709,
-  serialized_end=986,
+  serialized_start=901,
+  serialized_end=1275,
   methods=[
   _descriptor.MethodDescriptor(
     name='Get',
@@ -550,6 +663,15 @@ _KEYVALUESTORE = _descriptor.ServiceDescriptor(
     containing_service=None,
     input_type=_REQUESTVOTEREQUEST,
     output_type=_REQUESTVOTERESPONSE,
+    serialized_options=None,
+  ),
+  _descriptor.MethodDescriptor(
+    name='DEBUG_GetVariable',
+    full_name='kvstore.KeyValueStore.DEBUG_GetVariable',
+    index=4,
+    containing_service=None,
+    input_type=_DEBUG_GETVARIABLE_RESQUEST,
+    output_type=_DEBUG_GETVARIABLE_RESPONSE,
     serialized_options=None,
   ),
 ])
