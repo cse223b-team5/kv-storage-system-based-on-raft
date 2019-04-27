@@ -2,7 +2,6 @@ from concurrent import futures
 import time
 import sys
 import logging
-import random
 import threading
 import functools
 import grpc
@@ -13,7 +12,6 @@ import chaosmonkey_pb2_grpc
 from utils import load_config
 from chaos_server import ChaosServer
 from logging import Logger, StreamHandler, Formatter
-
 
 lock_append_log = threading.Lock()
 lock_ae_succeed_cnt = threading.Lock()
@@ -39,7 +37,7 @@ _ONE_DAY_IN_SECONDS = 60 * 60 * 24
 
 
 class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
-    def __init__(self, config_path, myIp, myPort):
+    def __init__(self, config_path, myIp, myPort, is_leader):
         self.configs = load_config(config_path)
         self.myIp = myIp
         self.myPort = myPort
@@ -63,8 +61,22 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         self.ae_succeed_cnt = 0
         self.apply_thread = None
 
+        self.is_leader = is_leader
+        self.init_states()
+
     def init_states(self):
-        self.revoke_apply_thread()
+        log_size = self.log
+        for i in range(len(self.configs)):
+            self.nextIndex.append = log_size
+            self.matchIndex.append(0)
+        if self.is_leader:
+            self.run_heartbeat_timer()
+        else:
+            self.revoke_apply_thread()
+
+    def run_heartbeat_timer(self):
+        self.heartbeat_timer = threading.Timer(self.configs['heartbeat_timeout'], self.heartbeat_once_to_all)
+        self.heartbeat_timer.start()
 
     @synchronized(lock_append_log)
     def append_to_local_log(self, key, value):
@@ -76,7 +88,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
 
     @synchronized(lock_decrement_nextIndex)
     def decrement_nextIndex(self, node_index):
-        self.node_index[node_index] -= 1
+        self.next_index[node_index] -= 1
 
     @synchronized(lock_try_extend_nextIndex)
     def try_extend_nextIndex(self, node_index, new_nextIndex):
@@ -148,7 +160,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
                 self.decrement_nextIndex(node_index)
                 self.heartbeat_once_to_one(ip, port, node_index)
 
-    def heartbeat_once_to_all(self, is_sync_entry):
+    def heartbeat_once_to_all(self, is_sync_entry=True):
         threads = []
         for ip_port_tuple, node_index in enumerate(self.configs['node']):
             ip = ip_port_tuple[0]
