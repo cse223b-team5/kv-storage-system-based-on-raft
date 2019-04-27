@@ -142,7 +142,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
             stub = storage_service_pb2_grpc.KeyValueStoreStub(channel)
             request, new_nextIndex = self.generate_append_entry_request(node_index)
             try:
-                response = stub.AppendEntries(request, timeout=self.configs['timeout'])
+                response = stub.AppendEntries(request, timeout=self.configs[float('rpc_timeout')])
             except TimeoutError:
                 self.logger.error("Timeout error when heartbeat to {}".format(node_index))
                 return
