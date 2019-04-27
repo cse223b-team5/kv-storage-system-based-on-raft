@@ -21,17 +21,21 @@ message GetRequest {
 
 message GetResponse {
     string value = 1;
-    string leaderId = 2
-    ReturnCode ret = 3;
+    string leader_ip = 2
+    string leader_port = 3
+    ReturnCode ret = 4;
 }
 
 message PutRequest {
     string key = 1;
     string value = 2;
+    string serial_no = 3;
 }
 
 message PutResponse {
     ReturnCode ret = 1;
+    string leader_ip = 2;
+    string leader_port = 3;
 }
 
 message AppendEntriesRequest {
@@ -40,11 +44,11 @@ message AppendEntriesRequest {
     int32 prevLogIndex = 3;
     int32 prevLogTerm = 4;
 
-    message entry {
+    message Entry {
         string key = 1;
         string value = 2;
     }
-    repeated entry entries = 5;
+    repeated Entry entries = 5;
 
     int32 leaderCommit = 6;
 }
