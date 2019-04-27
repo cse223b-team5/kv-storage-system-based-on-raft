@@ -339,7 +339,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
                                                              failed_for_term=False)  # inconsistency
 
         # TODO: step down to follower
-        # 3
+        # if candidate or leader then step down to follower
         i = len(self.log) - 1
         while i > request.prevLogIndex:
             self.log.pop(i)
