@@ -10,6 +10,8 @@ def load_config(config_path):
             elif item[0].startswith("node"):
                 addrs = item[1].split(":")
                 configs["nodes"].append((addrs[0], addrs[1]))
+            else:
+                configs[item[0]] = item[1]
             line = f.readline()
     return configs
 

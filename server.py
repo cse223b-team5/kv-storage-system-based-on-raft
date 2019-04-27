@@ -75,7 +75,9 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
             self.revoke_apply_thread()
 
     def run_heartbeat_timer(self):
-        self.heartbeat_timer = threading.Timer(self.configs['heartbeat_timeout'], self.heartbeat_once_to_all)
+        self.heartbeat_once_to_all()
+
+        self.heartbeat_timer = threading.Timer(self.configs['heartbeat_timeout'], self.run_heartbeat_timer)
         self.heartbeat_timer.start()
 
     @synchronized(lock_append_log)
@@ -159,7 +161,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
             stub = storage_service_pb2_grpc.KeyValueStoreStub(channel)
             request, new_nextIndex = self.generate_append_entry_request(node_index)
             try:
-                response = stub.AppendEntries(request, timeout=self.configs['timeout'])
+                response = stub.AppendEntries(request, timeout=self.configs[float('rpc_timeout')])
             except TimeoutError:
                 self.logger.error("Timeout error when heartbeat to {}".format(node_index))
                 return
@@ -225,7 +227,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
             stub = storage_service_pb2_grpc.KeyValueStoreStub(channel)
             request, new_nextIndex = self.generate_append_entry_request(receiver_index)
             try:
-                response = stub.AppendEntries(request, timeout=self.configs['timeout'])
+                response = stub.AppendEntries(request, timeout=self.configs['rpc_timeout'])
             except TimeoutError:
                 self.logger.info('AppendEntries call to node #'+str(receiver_index)+' timed out.')
                 return
@@ -313,12 +315,12 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
 
     def apply(self):
         while True:
-            if not self.check_is_leader():
+            if self.check_is_leader():
                 break
             if self.lastApplied < self.commitIndex:
                 self.write_to_state(self.lastApplied)
                 self.lastApplied += 1
-            time.sleep(0.5)
+            time.sleep(0.02)
 
     def revoke_apply_thread(self):
         if not self.apply_thread:
@@ -391,9 +393,9 @@ class ChaosServer(chaosmonkey_pb2_grpc.ChaosMonkeyServicer):
         return chaosmonkey_pb2.Status(ret=0)
 
 
-def serve(config_path, myIp, myPort):
+def serve(config_path, myIp, myPort, is_leader):
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-    storage_service_pb2_grpc.add_KeyValueStoreServicer_to_server(StorageServer(config_path, myIp, myPort), server)
+    storage_service_pb2_grpc.add_KeyValueStoreServicer_to_server(StorageServer(config_path, myIp, myPort, is_leader), server)
     chaosmonkey_pb2_grpc.add_ChaosMonkeyServicer_to_server(ChaosServer(), server)
 
     server.add_insecure_port(myIp+':'+myPort)
@@ -415,4 +417,5 @@ if __name__ == '__main__':
     config_path = sys.argv[1]
     myIp = sys.argv[2]
     myPort = sys.argv[3]
-    serve(config_path, myIp, myPort)
+    is_leader = bool(sys.argv[4])
+    serve(config_path, myIp, myPort, is_leader)
