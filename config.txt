@@ -1,4 +1,5 @@
 N: 5
+timeout: 3
 node0: ec2-52-32-163-134.us-west-2.compute.amazonaws.com:5001
 node1: ec2-52-34-48-36.us-west-2.compute.amazonaws.com:5001
 node2: ec2-35-164-213-69.us-west-2.compute.amazonaws.com:5001

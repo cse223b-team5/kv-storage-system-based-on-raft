@@ -21,7 +21,9 @@ message GetRequest {
 
 message GetResponse {
     string value = 1;
-    ReturnCode ret = 2;
+    string leader_ip = 2;
+    string leader_port = 3;
+    ReturnCode ret = 4;
 }
 
 message PutRequest {
