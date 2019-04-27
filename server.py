@@ -261,6 +261,52 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         # respond to client
         return storage_service_pb2.PutResponse(ret=0)
 
+    def AppendEntries(self, request, context):
+        # 1
+        if request.term < self.currentTerm:
+            return storage_service_pb2.AppendEntriesResponse(term = self.currentTerm, success = False, failed_for_term = True) # present leader is not real leader
+
+        # 2
+        if len(self.log) - 1 < request.prevLogIndex or len(self.log) - 1 >= request.prevLogIndex and self.log_term[request.prevLogIndex] != request.prevLogTerm:
+            return storage_service_pb2.AppendEntriesResponse(term=self.currentTerm, success=False,
+                                                             failed_for_term=False)  # inconsistency
+
+        # 3
+        i = len(self.log) - 1
+        while i > request.prevLogIndex:
+            self.log.pop(i)
+            i -= 1
+
+        # 4
+        for entry in request.entries:
+            self.log.append(entry)
+            self.log_term.append(request.term)
+            self.currentTerm = request.term
+
+        # 5
+        self.commitIndex = min(request.leaderCommit, len(self.log) - 1)
+
+        return storage_service_pb2.AppendEntriesResponse(term=self.currentTerm, success=True)
+
+
+    def RequestVote(self, request, context):
+        # 1
+        if request.term < self.currentTerm:
+            return storage_service_pb2.RequestVoteResponse(term=self.currentTerm, voteGranted=False)
+
+        # 2
+        if self.votedFor != None:
+            return storage_service_pb2.RequestVoteResponse(term=self.currentTerm, voteGranted=False)
+
+        #server的最新term是比较log_term的最后一个entry还是currentTerm；request.term = self.log_term[len(self.log)-1]的情况
+        if not (request.lastLogIndex > len(self.log) - 1 and request.term >= self.log_term[len(self.log)-1] \
+            or request.lastLogIndex <= len(self.log) - 1 and request.term > self.log_term[request.lastLogIndex]):
+            return storage_service_pb2.RequestVoteResponse(term=self.currentTerm, voteGranted=False)
+
+        self.votedFor = request.candidateId
+        self.currentTerm = request.term # 存疑，是否应该加
+        return storage_service_pb2.RequestVoteResponse(term=self.currentTerm, voteGranted=True)
+
     def update_commit_index(self, majority_cnt):
         i = self.commitIndex + 1
         while True:
@@ -298,7 +344,6 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         if not self.apply_thread:
             self.apply_thread = threading.Thread(target=self.apply, args=())
         self.apply_thread.start()
-
 
 
 class ChaosServer(chaosmonkey_pb2_grpc.ChaosMonkeyServicer):
