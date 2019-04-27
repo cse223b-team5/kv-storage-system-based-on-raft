@@ -1,0 +1,67 @@
+syntax = "proto3";
+// here
+package kvstore;
+
+service KeyValueStore {
+    rpc Get(GetRequest) returns (GetResponse) {}
+    rpc Put(PutRequest) returns (PutResponse) {}
+    rpc AppendEntries(AppendEntriesRequest) returns (AppendEntriesResponse) {}
+    rpc RequestVote(RequestVoteRequest) returns (RequestVoteResponse) {}
+}
+
+// You'll likely need to define more specific return codes than these!
+enum ReturnCode {
+    SUCCESS = 0;
+    FAILURE = 1;
+}
+
+message GetRequest {
+    string key = 1;
+}
+
+message GetResponse {
+    string value = 1;
+    ReturnCode ret = 2;
+}
+
+message PutRequest {
+    string key = 1;
+    string value = 2;
+}
+
+message PutResponse {
+    ReturnCode ret = 1;
+}
+
+message AppendEntriesRequest {
+    int32 term = 1;
+    int32 leaderId = 2;
+    int32 prevLogIndex = 3;
+    int32 prevLogTerm = 4;
+
+    message entry {
+        string key = 1;
+        string value = 2;
+    }
+    repeated entry entries = 5;
+
+    int32 leaderCommit = 6;
+}
+
+message AppendEntriesResponse {
+    int32 term = 1;
+    bool success = 2;
+    bool failed_for_term = 3;
+}
+
+message RequestVoteRequest {
+    int32 term = 1;
+    int32 candidateId = 2;
+    int32 lastLogIndex = 3;
+    int32 lastLogTerm = 4;
+}
+
+message RequestVoteResponse {
+    int32 term = 1;
+    bool voteGranted = 2;
+}
