@@ -261,6 +261,44 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         # respond to client
         return storage_service_pb2.PutResponse(ret=0)
 
+    def update_commit_index(self, majority_cnt):
+        i = self.commitIndex + 1
+        while True:
+            cnt = self.matchIndex.count(i)
+            if cnt < majority_cnt:
+                break
+            i += 1
+        i -= 1  # i is the max number to have appeared for more than majority_cnt times
+        if self.log[i] == self.currentTerm and self.check_is_leader():
+            self.try_extend_commitIndex(i)
+
+    def set_log(self):
+        logger = Logger(self.leaderIndex)
+        # logger.addHandler(FileHandler("{}_{}.log".format(PERSISTENT_PATH_PREFIC, self.name)))
+        ch = StreamHandler()
+        ch.setFormatter(Formatter("%(asctime)s %(levelname)s %(message)s"))
+        logger.addHandler(ch)
+        logger.setLevel("INFO")
+        return logger
+
+    def write_to_state(self, log_index):
+        k, v = self.log[log_index]
+        self.storage[k] = v
+
+    def apply(self):
+        while True:
+            if not self.check_is_leader():
+                break
+            if self.lastApplied < self.commitIndex:
+                self.write_to_state(self.lastApplied)
+                self.lastApplied += 1
+            time.sleep(0.5)
+
+    def revoke_apply_thread(self):
+        if not self.apply_thread:
+            self.apply_thread = threading.Thread(target=self.apply, args=())
+        self.apply_thread.start()
+        
     def AppendEntries(self, request, context):
         # 1
         if request.term < self.currentTerm:
@@ -310,43 +348,6 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         self.currentTerm = request.term # 存疑，是否应该加
         return storage_service_pb2.RequestVoteResponse(term=self.currentTerm, voteGranted=True)
 
-    def update_commit_index(self, majority_cnt):
-        i = self.commitIndex + 1
-        while True:
-            cnt = self.matchIndex.count(i)
-            if cnt < majority_cnt:
-                break
-            i += 1
-        i -= 1  # i is the max number to have appeared for more than majority_cnt times
-        if self.log[i] == self.currentTerm and self.check_is_leader():
-            self.try_extend_commitIndex(i)
-
-    def set_log(self):
-        logger = Logger(self.leaderIndex)
-        # logger.addHandler(FileHandler("{}_{}.log".format(PERSISTENT_PATH_PREFIC, self.name)))
-        ch = StreamHandler()
-        ch.setFormatter(Formatter("%(asctime)s %(levelname)s %(message)s"))
-        logger.addHandler(ch)
-        logger.setLevel("INFO")
-        return logger
-
-    def write_to_state(self, log_index):
-        k, v = self.log[log_index]
-        self.storage[k] = v
-
-    def apply(self):
-        while True:
-            if not self.check_is_leader():
-                break
-            if self.lastApplied < self.commitIndex:
-                self.write_to_state(self.lastApplied)
-                self.lastApplied += 1
-            time.sleep(0.5)
-
-    def revoke_apply_thread(self):
-        if not self.apply_thread:
-            self.apply_thread = threading.Thread(target=self.apply, args=())
-        self.apply_thread.start()
 
 
 class ChaosServer(chaosmonkey_pb2_grpc.ChaosMonkeyServicer):
