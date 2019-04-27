@@ -21,16 +21,6 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         self.myPort = myPort
         self.storage = {}
 
-        self.currentTerm = 0
-        self.votedFor = None
-        self.log = list() # [(key, value)] list of tuples
-        self.log_term = list()
-        self.commitIndex = 0
-        self.lastApplied = 0
-        self.nextIndex = list() #key: ip, value: corresponding nextIndex
-        self.matchIndex = list() #key: ip, value: corresponding matchIndex
-
-        self.node_index = 0
         for t in self.configs['nodes']:
             if t[0] == myIp and t[1] == myPort:
                 break
