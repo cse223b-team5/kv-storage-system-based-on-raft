@@ -299,12 +299,12 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
 
     def apply(self):
         while True:
-            if not self.check_is_leader():
+            if self.check_is_leader():
                 break
             if self.lastApplied < self.commitIndex:
                 self.write_to_state(self.lastApplied)
                 self.lastApplied += 1
-            time.sleep(0.5)
+            time.sleep(0.02)
 
     def revoke_apply_thread(self):
         if not self.apply_thread:
