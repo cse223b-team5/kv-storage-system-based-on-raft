@@ -271,6 +271,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
             return storage_service_pb2.AppendEntriesResponse(term=self.currentTerm, success=False,
                                                              failed_for_term=False)  # inconsistency
 
+        # TODO: step down to follower
         # 3
         i = len(self.log) - 1
         while i > request.prevLogIndex:
@@ -304,6 +305,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
             or request.lastLogIndex <= len(self.log) - 1 and request.term > self.log_term[request.lastLogIndex]):
             return storage_service_pb2.RequestVoteResponse(term=self.currentTerm, voteGranted=False)
 
+        # TODO: step down to follower
         self.votedFor = request.candidateId
         self.currentTerm = request.term # 存疑，是否应该加
         return storage_service_pb2.RequestVoteResponse(term=self.currentTerm, voteGranted=True)
