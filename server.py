@@ -281,7 +281,8 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         for entry in request.entries:
             self.log.append(entry)
             self.log_term.append(request.term)
-            self.currentTerm = request.term
+
+        self.currentTerm = request.term
 
         # 5
         self.commitIndex = min(request.leaderCommit, len(self.log) - 1)
