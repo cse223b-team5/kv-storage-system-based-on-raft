@@ -127,18 +127,17 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
 
     def DEBUG_GetVariable(self, request):
         response = storage_service_pb2.DEBUG_GetVariable_Response()
-        variable = response.variables.add()
 
         if request.variable == 'matchIndex':
-            variable.value = str(self.matchIndex)
+            response.variable.value = str(self.matchIndex)
         elif request.variable == 'nextIndex':
-            variable.value = str(self.nextIndex)
+            response.variable.value = str(self.nextIndex)
         elif request.variable == 'log':
-            variable.value = str(self.storage)
+            response.variable.value = str(self.storage)
         elif request.variable == 'all':
-            variable.value = str(self.__dict__)
+            response.variable.value = str(self.__dict__)
         else:
-            variable.value = 'Invaid variable.'
+            response.variable.value = 'Invaid variable.'
 
         return response
 
