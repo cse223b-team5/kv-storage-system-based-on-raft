@@ -281,7 +281,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
                 break
             i += 1
         i -= 1  # i is the max number to have appeared for more than majority_cnt times
-        if self.log[i] == self.currentTerm and self.check_is_leader():
+        if self.check_is_leader():
             self.try_extend_commitIndex(i)
 
     def set_log(self):
