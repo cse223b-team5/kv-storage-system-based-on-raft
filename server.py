@@ -13,13 +13,13 @@ from utils import load_config
 from chaos_server import ChaosServer
 from logging import Logger, StreamHandler, Formatter
 
-lock_append_log = threading.Lock()
-lock_ae_succeed_cnt = threading.Lock()
+lock_persistent_operations = threading.Lock()
 lock_decrement_nextIndex = threading.Lock()
 lock_try_extend_nextIndex = threading.Lock()
 lock_try_extend_matchIndex = threading.Lock()
 lock_state_machine = threading.Lock()
 lock_try_extend_commitIndex = threading.Lock()
+# The memory operations on voteFor, log[]/log_term[], and state, and their persistency is protected by a single lock
 
 
 def synchronized(lock):
@@ -47,6 +47,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
 
         self.currentTerm = 0
         self.voteFor = 0
+        self.state = 0
         self.log = list()  # [(k,v)] list of tuples
         self.log_term = list()  # []
         self.commitIndex = -1  # has been committed
@@ -58,7 +59,6 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         self.leaderIndex = 0
         self.logger = self.set_log()
         self.last_commit_history = dict()  # client_id -> (serial_no, result)
-        self.ae_succeed_cnt = 0
         self.apply_thread = None
         self.is_leader = (self.node_index == 0)
         self.init_states()
@@ -80,15 +80,22 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         self.heartbeat_timer = threading.Timer(float(self.configs['heartbeat_timeout']), self.run_heartbeat_timer)
         self.heartbeat_timer.start()
 
-    @synchronized(lock_append_log)
+    @synchronized(lock_persistent_operations)
     def append_to_local_log(self, key, value):
         self.log.append((key, value))
         self.log_term.append(self.currentTerm)
+        self.persistent()
         print('Local log: ' + str(self.log))
+        
+    @synchronized(lock_persistent_operations)
+    def update_voteFor(self, new_voteFor):
+        self.voteFor = new_voteFor
+        self.persistent()
 
-    @synchronized(lock_ae_succeed_cnt)
-    def increment_ae_succeed_cnt(self):
-        self.ae_succeed_cnt += 1
+    @synchronized(lock_persistent_operations)
+    def update_state(self, new_state):
+        self.state = new_state
+        self.persistent()
 
     @synchronized(lock_decrement_nextIndex)
     def decrement_nextIndex(self, node_index):
@@ -234,7 +241,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         # same case for matchIndex
         self.try_extend_matchIndex(node_index, new_nextIndex - 1)
 
-    def replicate_log_entries_to_one(self, ip, port, receiver_index):
+    def replicate_log_entries_to_one(self, ip, port, receiver_index, ae_succeed_cnt, lock_ae_succeed_cnt):
         with grpc.insecure_channel(ip + ':' + port) as channel:
             stub = storage_service_pb2_grpc.KeyValueStoreStub(channel)
             request, new_nextIndex = self.generate_append_entry_request(receiver_index)
@@ -246,7 +253,9 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
 
             if response.success:
                 self.update_nextIndex_and_matchIndex(receiver_index, new_nextIndex)
-                self.increment_ae_succeed_cnt()
+                # increment ae_succeed_cnt
+                with lock_ae_succeed_cnt:
+                    ae_succeed_cnt += 1
             elif response.failed_for_term:
                 # TODO: step down to follower
                 pass
@@ -255,11 +264,12 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
                 self.decrement_nextIndex(receiver_index)
                 self.replicate_log_entries_to_one(ip, port, receiver_index)
 
-    def replicate_log_entries_to_all(self):
+    def replicate_log_entries_to_all(self, ae_succeed_cnt):
+        lock_ae_succeed_cnt = threading.Lock()
         for node_index, ip_port_tuple in enumerate(self.configs['nodes']):
             if node_index != self.node_index:
                 ae_thread = threading.Thread(target=self.replicate_log_entries_to_one,
-                                             args=(ip_port_tuple[0], ip_port_tuple[1], node_index))
+                    args=(ip_port_tuple[0], ip_port_tuple[1], node_index, ae_succeed_cnt, lock_ae_succeed_cnt))
                 ae_thread.start()
 
     def Put(self, request, context):
@@ -279,16 +289,16 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
 
         self.append_to_local_log(request.key, request.value)
 
-        self.ae_succeed_cnt = 0
-        self.replicate_log_entries_to_all()
+        ae_succeed_cnt = 0
+        self.replicate_log_entries_to_all(ae_succeed_cnt)
 
         majority_cnt = len(self.configs['nodes']) // 2 + 1
-        while self.ae_succeed_cnt < majority_cnt:
+        while ae_succeed_cnt < majority_cnt:
             if not self.check_is_leader():
                 return storage_service_pb2.PutResponse(ret=1)
             continue
 
-        if self.ae_succeed_cnt < majority_cnt:
+        if ae_succeed_cnt < majority_cnt:
             # client request failed
             return storage_service_pb2.PutResponse(ret=1)
 
