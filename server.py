@@ -14,7 +14,6 @@ from chaos_server import ChaosServer
 from logging import Logger, StreamHandler, Formatter
 
 lock_persistent_operations = threading.Lock()
-lock_ae_succeed_cnt = threading.Lock()
 lock_decrement_nextIndex = threading.Lock()
 lock_try_extend_nextIndex = threading.Lock()
 lock_try_extend_matchIndex = threading.Lock()
@@ -48,6 +47,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
 
         self.currentTerm = 0
         self.voteFor = 0
+        self.state = 0
         self.log = list()  # [(k,v)] list of tuples
         self.log_term = list()  # []
         self.commitIndex = -1  # has been committed
@@ -84,15 +84,18 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
     def append_to_local_log(self, key, value):
         self.log.append((key, value))
         self.log_term.append(self.currentTerm)
+        self.persistent()
         print('Local log: ' + str(self.log))
         
     @synchronized(lock_persistent_operations)
     def update_voteFor(self, new_voteFor):
         self.voteFor = new_voteFor
+        self.persistent()
 
     @synchronized(lock_persistent_operations)
     def update_state(self, new_state):
         self.state = new_state
+        self.persistent()
 
     @synchronized(lock_decrement_nextIndex)
     def decrement_nextIndex(self, node_index):
