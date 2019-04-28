@@ -1,6 +1,7 @@
 from concurrent import futures
 import time
 import sys
+import os
 import logging
 import threading
 import functools
@@ -20,6 +21,8 @@ lock_try_extend_nextIndex = threading.Lock()
 lock_try_extend_matchIndex = threading.Lock()
 lock_state_machine = threading.Lock()
 lock_try_extend_commitIndex = threading.Lock()
+
+PERSISTENT_PATH_PREFIC = "/tmp/223b_raft_"
 
 
 def synchronized(lock):
@@ -398,6 +401,12 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         self.votedFor = request.candidateId
         self.currentTerm = request.term # 存疑，是否应该加
         return storage_service_pb2.RequestVoteResponse(term=self.currentTerm, voteGranted=True)
+
+    def persist(self, state_str):
+        with open(self.get_persist_path(), 'w') as f:
+            f.write(state_str)
+            f.flush()
+            os.fsync(f.fileno())
 
 
 class ChaosServer(chaosmonkey_pb2_grpc.ChaosMonkeyServicer):
