@@ -46,7 +46,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         self.node_index = self.get_node_index_by_addr(myIp, myPort)
 
         self.currentTerm = 0
-        self.voteFor = 0
+        self.voteFor = None
         self.log = list()  # [(k,v)] list of tuples
         self.log_term = list()  # []
         self.commitIndex = -1  # has been committed
@@ -58,10 +58,16 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         self.leaderIndex = 0
         self.logger = self.set_log()
         self.last_commit_history = dict()  # client_id -> (serial_no, result)
-        self.ae_succeed_cnt = 0
+        self.ae_succeed_cnt = 0 # the number of votes the candidate gets
         self.apply_thread = None
         self.is_leader = (self.node_index == 0)
         self.init_states()
+
+        self.state = 0  # 0: follower, 1: candidate 2: leader
+        self.heartbeat_timer = None # used for heartbeat only
+        self.timer = None # used for convert_to_candidate and requestVote periodically
+        self._lock = threading.Lock()
+        self.voteCnt = 0
 
     def init_states(self):
         log_size = len(self.log)
@@ -349,7 +355,6 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
     def AppendEntries(self, request, context):
         self.logger.info('{} received AppendEntries call from node (term:{}, leaderId:{})'.format(
             self.node_index, request.term, request.leaderId))
-
         # print('Leader\'s commitIndex is: {}'.format(request.leaderCommit))
 
         # 1
@@ -380,8 +385,8 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
 
         return storage_service_pb2.AppendEntriesResponse(term=self.currentTerm, success=True)
 
-
     def RequestVote(self, request, context):
+        # TODO: need to modify RequestVote() according to Ling's exposed_request_vote()
         # 1
         if request.term < self.currentTerm:
             return storage_service_pb2.RequestVoteResponse(term=self.currentTerm, voteGranted=False)
@@ -396,6 +401,84 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         self.votedFor = request.candidateId
         self.currentTerm = request.term # 存疑，是否应该加
         return storage_service_pb2.RequestVoteResponse(term=self.currentTerm, voteGranted=True)
+
+    def convert_to_follower(self, term):
+        self.logger.info('{} converts to follower in term {}'.format(self.node_index, term))
+
+        # TODO: invoke Jie's stateIntnitialize function: reset state, voteFor, term, count and persist
+        # TODO: voteCnt reset
+        self.persist()
+        self.reset_election_timer()
+        # if the previous state is leader, then set the timer
+        if self.heartbeat_timer:
+            self.heartbeat_timer.cancel()
+
+    def convert_to_candidate(self):
+        # TODO: increment term by 1, set voteCnt and state to 1, set voteFor to self.node_index
+        self.persist()
+        self.logger.info('{} converts to candidate in term {}'.format(self.node_index, self.currentTerm))
+        self.reset_election_timer()
+        self.ask_for_vote_to_all()
+
+    def convert_to_leader(self):
+        self.logger.info('{} converts to leader in term {}'.format(self.node_index, self.currentTerm))
+        # TODO: add cancel_election_timer() function
+        self.cancel_election_timer()
+        # TODO: set state to 2
+        self.persist()
+        # TODO: is run_heartbeat_timer() same as set_heart_beat() which is not defined
+        self.run_heartbeat_timer()
+
+
+    def ask_for_vote_to_all(self):
+        # send RPC requests to all other nodes
+        for t in self.configs['nodes']:
+            if t[0] == self.ip and t[1] == self.port:
+                continue
+            try:
+                node_index = self.get_node_index_by_addr(t[0], t[1])
+                requestVote_thread = threading.Thread(target=self.ask_for_vote_to_one, args=(t[0], t[1], node_index))
+                requestVote_thread.start()
+            except Exception as e:
+                self.logger.error("node{} in term {} ask_for_vote error".format(self.node_index, self.currentTerm))
+
+    def ask_for_vote_to_one(self, ip, port, node_index):
+        self.logger.info('{} ask vote from {} in term {}'.format(self.node_index, node_index, self.currentTerm))
+        # TODO: consider whether we need to consider the current state, 如果此时不是candidate，不requestVote
+        with grpc.insecure_channel(ip + ':' + port) as channel:
+            stub = storage_service_pb2_grpc.KeyValueStoreStub(channel)
+            request = self.generate_RequestVote_request()
+            try:
+                response = stub.RequestVote(request, timeout=float(self.configs['rpc_timeout']))
+            except Exception:
+                self.logger.error("Timeout error when requestVote to {}".format(node_index))
+                return
+            if response.term < self.currentTerm:
+                return
+            elif request.term > self.currentTerm:
+                self.convert_to_follower(request.term)
+            else:
+                if request.voteGranted:
+                    # TODO: increment voteCnt by 1
+                    #with self._lock:
+                    #    self.cnt += 1
+                    self.persist()
+                    self.logger.info("get one vote from node {}, current voteCnt is {}".format(node_index, self.voteCnt))
+                    majority_cnt = len(self.configs['nodes']) // 2 + 1
+                    if self.state != 2 and self.voteCnt >= majority_cnt:
+                        self.convert_to_leader()
+
+    def generate_RequestVote_request(self):
+        request = storage_service_pb2.RequestVoteRequest()
+        request.term = self.currentTerm
+        request.candidateId = self.node_index
+        # consider the length of log equal to 0, i.e., no entries in candidate's log.
+        request.lastLogIndex = len(self.log) - 1
+        if request.lastLogIndex < 0:
+            request.lastLogTerm = 0
+        else:
+            request.lastLogTerm = self.log_term[-1]
+        return request
 
 
 class ChaosServer(chaosmonkey_pb2_grpc.ChaosMonkeyServicer):
