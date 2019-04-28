@@ -301,6 +301,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         # record in history
         self.last_commit_history[client_id] = (request.serial_no, True)
 
+        print('----------------------------------------------')
         # respond to client
         return storage_service_pb2.PutResponse(ret=0)
 
@@ -331,7 +332,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         while True:
             if self.check_is_leader():
                 break
-            if self.lastApplied < self.commitIndex:
+            if self.lastApplied <= self.commitIndex:
                 self.write_to_state(self.lastApplied)
                 self.lastApplied += 1
             time.sleep(0.02)
@@ -345,7 +346,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         self.logger.info('{} received AppendEntries call from node (term:{}, leaderId:{})'.format(
             self.node_index, request.term, request.leaderId))
 
-        print('Leader\'s commitIndex is: {}'.format(request.leaderCommit))
+        # print('Leader\'s commitIndex is: {}'.format(request.leaderCommit))
 
         # 1
         if request.term < self.currentTerm:
@@ -367,13 +368,14 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
 
         # 4
         for entry in request.entries:
-            self.log.append(entry)
+            self.log.append((entry.key, entry.value))
             self.log_term.append(request.term)
 
         self.currentTerm = request.term
 
         # 5
         self.commitIndex = min(request.leaderCommit, len(self.log) - 1)
+        print('Local log: ' + str(self.log))
 
         return storage_service_pb2.AppendEntriesResponse(term=self.currentTerm, success=True)
 
