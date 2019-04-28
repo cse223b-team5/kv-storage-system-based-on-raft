@@ -350,8 +350,6 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         self.logger.info('{} received AppendEntries call from node (term:{}, leaderId:{})'.format(
             self.node_index, request.term, request.leaderId))
 
-        # print('Leader\'s commitIndex is: {}'.format(request.leaderCommit))
-
         # 1
         if request.term < self.currentTerm:
             return storage_service_pb2.AppendEntriesResponse(
