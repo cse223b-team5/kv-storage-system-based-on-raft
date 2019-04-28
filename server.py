@@ -87,6 +87,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
     def append_to_local_log(self, key, value):
         self.log.append((key, value))
         self.log_term.append(self.currentTerm)
+        print('Local log: ' + str(self.log))
 
     @synchronized(lock_ae_succeed_cnt)
     def increment_ae_succeed_cnt(self):
@@ -114,6 +115,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
     @synchronized(lock_state_machine)
     def modify_state_machine(self, key, value):
         self.storage[key] = value
+        self.lastApplied = self.commitIndex
 
     def check_is_leader(self):
         return self.node_index == self.leaderIndex
@@ -131,7 +133,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         port = self.configs['nodes'][self.leaderIndex][1]
         return ip, port
 
-    def DEBUG_GetVariable(self, request):
+    def DEBUG_GetVariable(self, request, context):
         response = storage_service_pb2.DEBUG_GetVariable_Response()
 
         if request.variable == 'matchIndex':
@@ -246,8 +248,8 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
                 return
 
             if response.success:
-                self.increment_ae_succeed_cnt()
                 self.update_nextIndex_and_matchIndex(receiver_index, new_nextIndex)
+                self.increment_ae_succeed_cnt()
             elif response.failed_for_term:
                 # TODO: step down to follower
                 pass
@@ -276,13 +278,12 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
             if request.serial_no == self.last_commit_history[client_id][0] and self.last_commit_history[client_id][1]:
                 return storage_service_pb2.PutResponse(ret=0)
 
+        print('----------------------------------------------------------------------')
+
         self.append_to_local_log(request.key, request.value)
 
+        self.ae_succeed_cnt = 0
         self.replicate_log_entries_to_all()
-        
-        print('Leader matchIndex: ' + str(self.matchIndex))
-        print('Leader nextIndex: ' + str(self.nextIndex))
-        print(str(self.__dict__))
 
         majority_cnt = len(self.configs['nodes']) // 2 + 1
         while self.ae_succeed_cnt < majority_cnt:
@@ -304,13 +305,17 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         # record in history
         self.last_commit_history[client_id] = (request.serial_no, True)
 
-        print('----------------------------------------------')
+        print('Leader matchIndex: ' + str(self.matchIndex))
+        print('Leader nextIndex: ' + str(self.nextIndex))
+        print(str(self.__dict__))
+        print('----------------------------------------------------------------------')
         # respond to client
         return storage_service_pb2.PutResponse(ret=0)
 
     def update_commit_index(self):
         tmp_matchIndex = sorted(self.matchIndex)
         n = len(tmp_matchIndex)
+        print('matchIndex:' + str(self.matchIndex))
         new_commitIndex = tmp_matchIndex[(n-1)//2]
         # i is the max number to have appeared for more than majority_cnt times
         if self.check_is_leader():
@@ -327,7 +332,6 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         return logger
 
     def write_to_state(self, log_index):
-        print('log and log index: {}, {}'.format(str(self.log), log_index))
         k, v = self.log[log_index]
         self.storage[k] = v
 
@@ -370,15 +374,12 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
             i -= 1
 
         # 4
-        for entry in request.entries:
-            self.log.append((entry.key, entry.value))
-            self.log_term.append(request.term)
-
         self.currentTerm = request.term
+        for entry in request.entries:
+            self.append_to_local_log(entry.key, entry.value)
 
         # 5
         self.commitIndex = min(request.leaderCommit, len(self.log) - 1)
-        print('Local log: ' + str(self.log))
 
         return storage_service_pb2.AppendEntriesResponse(term=self.currentTerm, success=True)
 
