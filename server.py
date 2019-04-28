@@ -37,39 +37,39 @@ _ONE_DAY_IN_SECONDS = 60 * 60 * 24
 
 
 class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
-    def __init__(self, config_path, myIp, myPort, is_leader):
+    def __init__(self, config_path, myIp, myPort):
         self.configs = load_config(config_path)
         self.myIp = myIp
         self.myPort = myPort
         self.storage = {}
         self.term = 0
-        self.logger = self.set_log()
         self.node_index = self.get_node_index_by_addr(myIp, myPort)
 
         self.currentTerm = 0
         self.voteFor = 0
         self.log = list()  # [(k,v)] list of tuples
         self.log_term = list()  # []
-        self.commitIndex = 0 # has been committed
+        self.commitIndex = -1  # has been committed
         self.lastApplied = 0
         self.nextIndex = list()  # has not yet been appended
         self.matchIndex = list()  # has been matched
         # TODO: call a function to properly initialize these variables
 
         self.leaderIndex = 0
+        self.logger = self.set_log()
         self.last_commit_history = dict()  # client_id -> (serial_no, result)
         self.ae_succeed_cnt = 0
         self.apply_thread = None
-
-        self.is_leader = is_leader
+        self.is_leader = (self.node_index == 0)
         self.init_states()
 
     def init_states(self):
-        log_size = self.log
-        for i in range(len(self.configs)):
-            self.nextIndex.append = log_size
-            self.matchIndex.append(0)
+        log_size = len(self.log)
+        for i in range(len(self.configs['nodes'])):
+            self.nextIndex.append(log_size)
+            self.matchIndex.append(-1)
         if self.is_leader:
+            self.logger.info('This node is leader.')
             self.run_heartbeat_timer()
         else:
             self.revoke_apply_thread()
@@ -77,12 +77,13 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
     def run_heartbeat_timer(self):
         self.heartbeat_once_to_all()
 
-        self.heartbeat_timer = threading.Timer(self.configs['heartbeat_timeout'], self.run_heartbeat_timer)
+        self.heartbeat_timer = threading.Timer(float(self.configs['heartbeat_timeout']), self.run_heartbeat_timer)
         self.heartbeat_timer.start()
 
     @synchronized(lock_append_log)
     def append_to_local_log(self, key, value):
         self.log.append((key, value))
+        self.log_term.append(self.currentTerm)
 
     @synchronized(lock_ae_succeed_cnt)
     def increment_ae_succeed_cnt(self):
@@ -123,8 +124,8 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         return index
 
     def get_leader_ip_port(self):
-        ip = self.configs['node'][self.leaderIndex][0]
-        port = self.configs['node'][self.leaderIndex][1]
+        ip = self.configs['nodes'][self.leaderIndex][0]
+        port = self.configs['nodes'][self.leaderIndex][1]
         return ip, port
 
     def DEBUG_GetVariable(self, request):
@@ -161,13 +162,14 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
             stub = storage_service_pb2_grpc.KeyValueStoreStub(channel)
             request, new_nextIndex = self.generate_append_entry_request(node_index)
             try:
-                response = stub.AppendEntries(request, timeout=self.configs[float('rpc_timeout')])
-            except TimeoutError:
+                response = stub.AppendEntries(request, timeout=float(self.configs['rpc_timeout']))
+            except Exception:
                 self.logger.error("Timeout error when heartbeat to {}".format(node_index))
                 return
 
             if response.success:
                 self.update_nextIndex_and_matchIndex(node_index, new_nextIndex)
+                self.logger.info('Heartbeat to {} succeeded.'.format(node_index))
             elif response.failed_for_term:
                 # TODO: step down to follower
                 pass
@@ -176,15 +178,17 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
                 if not is_sync_entry:
                     # when there is no need to sync entries to followers in heartbeart
                     return
+                self.logger.error('When heartbeat to node{}, inconsistency detected.'.format(node_index))
                 self.decrement_nextIndex(node_index)
                 self.heartbeat_once_to_one(ip, port, node_index)
 
     def heartbeat_once_to_all(self, is_sync_entry=True):
+        self.logger.info('Start sending heartbeat_once_to_all.')
         threads = []
-        for ip_port_tuple, node_index in enumerate(self.configs['node']):
+        for node_index, ip_port_tuple in enumerate(self.configs['nodes']):
             ip = ip_port_tuple[0]
             port = ip_port_tuple[1]
-            if ip == self.myIp:
+            if ip == self.myIp and port == self.myPort:
                 continue
             ae_thread = threading.Thread(target=self.heartbeat_once_to_one, args=(ip, port, node_index, is_sync_entry))
             threads.append(ae_thread)
@@ -200,7 +204,13 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
 
         entry_start_index = self.nextIndex[node_index]
         request.prevLogIndex = entry_start_index - 1
-        request.prevLogTerm = self.log_term[request.prevLogIndex]
+
+        # print('log_term and preLogIndex: {},{}'.format(self.log_term, request.prevLogIndex))
+        
+        if request.prevLogIndex < 0:
+            request.prevLogTerm = 0
+        else:
+            request.prevLogTerm = self.log_term[request.prevLogIndex]
         request.leaderCommit = self.commitIndex
 
         # here there is no new entry to send in some situations like heartbeat
@@ -227,8 +237,8 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
             stub = storage_service_pb2_grpc.KeyValueStoreStub(channel)
             request, new_nextIndex = self.generate_append_entry_request(receiver_index)
             try:
-                response = stub.AppendEntries(request, timeout=self.configs['rpc_timeout'])
-            except TimeoutError:
+                response = stub.AppendEntries(request, timeout=float(self.configs['rpc_timeout']))
+            except Exception:
                 self.logger.info('AppendEntries call to node #'+str(receiver_index)+' timed out.')
                 return
 
@@ -244,7 +254,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
                 self.replicate_log_entries_to_one(ip, port, receiver_index)
 
     def replicate_log_entries_to_all(self):
-        for ip_port_tuple, node_index in enumerate(self.configs['node']):
+        for node_index, ip_port_tuple in enumerate(self.configs['nodes']):
             if node_index != self.node_index:
                 ae_thread = threading.Thread(target=self.replicate_log_entries_to_one,
                                              args=(ip_port_tuple[0], ip_port_tuple[1], node_index))
@@ -253,8 +263,8 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
     def Put(self, request, context):
         #  check if current node is leader. if not, help client redirect
         if not self.check_is_leader():
-            ip = self.configs['node'][self.leaderIndex][0]
-            port = self.configs['node'][self.leaderIndex][1]
+            ip = self.configs['nodes'][self.leaderIndex][0]
+            port = self.configs['nodes'][self.leaderIndex][1]
             return storage_service_pb2.PutResponse(leader_ip=ip, leader_port=port)
 
         # to guarantee the 'at-most-once' rule; check commit history
@@ -266,8 +276,12 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         self.append_to_local_log(request.key, request.value)
 
         self.replicate_log_entries_to_all()
+        
+        print('Leader matchIndex: ' + str(self.matchIndex))
+        print('Leader nextIndex: ' + str(self.nextIndex))
+        print(str(self.__dict__))
 
-        majority_cnt = len(self.configs['node']) // 2 + 1
+        majority_cnt = len(self.configs['nodes']) // 2 + 1
         while self.ae_succeed_cnt < majority_cnt:
             if not self.check_is_leader():
                 return storage_service_pb2.PutResponse(ret=1)
@@ -278,7 +292,8 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
             return storage_service_pb2.PutResponse(ret=1)
 
         # update commitIndex
-        self.update_commit_index(majority_cnt)
+        print('majority_cnt: {}'.format(majority_cnt))
+        self.update_commit_index()
 
         # apply to state machine
         self.modify_state_machine(request.key, request.value)
@@ -286,19 +301,18 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         # record in history
         self.last_commit_history[client_id] = (request.serial_no, True)
 
+        print('----------------------------------------------')
         # respond to client
         return storage_service_pb2.PutResponse(ret=0)
 
-    def update_commit_index(self, majority_cnt):
-        i = self.commitIndex + 1
-        while True:
-            cnt = self.matchIndex.count(i)
-            if cnt < majority_cnt:
-                break
-            i += 1
-        i -= 1  # i is the max number to have appeared for more than majority_cnt times
+    def update_commit_index(self):
+        tmp_matchIndex = sorted(self.matchIndex)
+        n = len(tmp_matchIndex)
+        new_commitIndex = tmp_matchIndex[(n-1)//2]
+        # i is the max number to have appeared for more than majority_cnt times
         if self.check_is_leader():
-            self.try_extend_commitIndex(i)
+            print('Leader wants to update commitIndex to {}.'.format(new_commitIndex))
+            self.try_extend_commitIndex(new_commitIndex)
 
     def set_log(self):
         logger = Logger(self.leaderIndex)
@@ -306,10 +320,11 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         ch = StreamHandler()
         ch.setFormatter(Formatter("%(asctime)s %(levelname)s %(message)s"))
         logger.addHandler(ch)
-        logger.setLevel("INFO")
+        logger.setLevel("ERROR")
         return logger
 
     def write_to_state(self, log_index):
+        print('log and log index: {}, {}'.format(str(self.log), log_index))
         k, v = self.log[log_index]
         self.storage[k] = v
 
@@ -317,7 +332,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         while True:
             if self.check_is_leader():
                 break
-            if self.lastApplied < self.commitIndex:
+            if self.lastApplied <= self.commitIndex:
                 self.write_to_state(self.lastApplied)
                 self.lastApplied += 1
             time.sleep(0.02)
@@ -328,14 +343,21 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         self.apply_thread.start()
         
     def AppendEntries(self, request, context):
+        self.logger.info('{} received AppendEntries call from node (term:{}, leaderId:{})'.format(
+            self.node_index, request.term, request.leaderId))
+
+        # print('Leader\'s commitIndex is: {}'.format(request.leaderCommit))
+
         # 1
         if request.term < self.currentTerm:
-            return storage_service_pb2.AppendEntriesResponse(term = self.currentTerm, success = False, failed_for_term = True) # present leader is not real leader
+            return storage_service_pb2.AppendEntriesResponse(
+                term=self.currentTerm, success=False, failed_for_term=True)  # present leader is not real leader
 
-        # 2
-        if len(self.log) - 1 < request.prevLogIndex or len(self.log) - 1 >= request.prevLogIndex and self.log_term[request.prevLogIndex] != request.prevLogTerm:
-            return storage_service_pb2.AppendEntriesResponse(term=self.currentTerm, success=False,
-                                                             failed_for_term=False)  # inconsistency
+        # 2 when request.prevLogIndex < 0, it should be regarded as log consistent
+        if len(self.log) - 1 < request.prevLogIndex or \
+                len(self.log) - 1 >= request.prevLogIndex >= 0 and self.log_term[request.prevLogIndex] != request.prevLogTerm:
+            return storage_service_pb2.AppendEntriesResponse(
+                term=self.currentTerm, success=False, failed_for_term=False)  # inconsistency
 
         # TODO: step down to follower
         # if candidate or leader then step down to follower
@@ -346,13 +368,14 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
 
         # 4
         for entry in request.entries:
-            self.log.append(entry)
+            self.log.append((entry.key, entry.value))
             self.log_term.append(request.term)
 
         self.currentTerm = request.term
 
         # 5
         self.commitIndex = min(request.leaderCommit, len(self.log) - 1)
+        print('Local log: ' + str(self.log))
 
         return storage_service_pb2.AppendEntriesResponse(term=self.currentTerm, success=True)
 
@@ -393,9 +416,9 @@ class ChaosServer(chaosmonkey_pb2_grpc.ChaosMonkeyServicer):
         return chaosmonkey_pb2.Status(ret=0)
 
 
-def serve(config_path, myIp, myPort, is_leader):
+def serve(config_path, myIp, myPort):
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-    storage_service_pb2_grpc.add_KeyValueStoreServicer_to_server(StorageServer(config_path, myIp, myPort, is_leader), server)
+    storage_service_pb2_grpc.add_KeyValueStoreServicer_to_server(StorageServer(config_path, myIp, myPort), server)
     chaosmonkey_pb2_grpc.add_ChaosMonkeyServicer_to_server(ChaosServer(), server)
 
     server.add_insecure_port(myIp+':'+myPort)
@@ -417,5 +440,4 @@ if __name__ == '__main__':
     config_path = sys.argv[1]
     myIp = sys.argv[2]
     myPort = sys.argv[3]
-    is_leader = bool(sys.argv[4])
-    serve(config_path, myIp, myPort, is_leader)
+    serve(config_path, myIp, myPort)
