@@ -10,7 +10,7 @@ global configs
 
 
 def get_leader_addr():
-    return configs['node'][0]
+    return configs['nodes'][0]
 
 
 def get(key):
@@ -21,6 +21,7 @@ def get(key):
         if response.ret == 0:
             print(response.value)
         else:
+            print(response.leader_ip, response.leader_port)
             print('Failed!')
 
 
