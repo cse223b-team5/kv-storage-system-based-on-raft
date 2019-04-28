@@ -58,6 +58,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         self.matchIndex = list()  # has been matched
         # TODO: call a function to properly initialize these variables
 
+        self.state = 0 # 0: follower, 1: candidate 2:leader
         self.leaderIndex = 0
         self.logger = self.set_log()
         self.last_commit_history = dict()  # client_id -> (serial_no, result)
@@ -82,6 +83,19 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
 
         self.heartbeat_timer = threading.Timer(float(self.configs['heartbeat_timeout']), self.run_heartbeat_timer)
         self.heartbeat_timer.start()
+
+    def set_election_timer(self):
+        self.timer = threading.Timer(self.get_random_timeout(), self.convert_to_candidate)
+        self.timer.start()
+
+    def cancel_election_timer(self):
+        if self.timer:
+            self.timer.cancel()
+
+    def reset_election_timer(self):
+        if self.timer:
+            self.timer.cancel()
+        self.set_election_timer()
 
     @synchronized(lock_append_log)
     def append_to_local_log(self, key, value):
