@@ -367,8 +367,6 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         self.logger.info('{} received AppendEntries call from node (term:{}, leaderId:{})'.format(
             self.node_index, request.term, request.leaderId))
 
-        # print('Leader\'s commitIndex is: {}'.format(request.leaderCommit))
-
         # 1
         if request.term < self.currentTerm:
             return storage_service_pb2.AppendEntriesResponse(
@@ -404,9 +402,6 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
             return storage_service_pb2.RequestVoteResponse(term=self.currentTerm, voteGranted=False)
 
         # 2
-        if self.votedFor != None:
-            return storage_service_pb2.RequestVoteResponse(term=self.currentTerm, voteGranted=False)
-
         #server的最新term是比较log_term的最后一个entry还是currentTerm；request.term = self.log_term[len(self.log)-1]的情况
         if not (request.lastLogIndex > len(self.log) - 1 and request.term >= self.log_term[len(self.log)-1] \
             or request.lastLogIndex <= len(self.log) - 1 and request.term > self.log_term[request.lastLogIndex]):
