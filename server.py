@@ -49,7 +49,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         self.node_index = self.get_node_index_by_addr(myIp, myPort)
 
         self.currentTerm = 0
-        self.voteFor = 0
+        self.voteFor = None
         self.log = list()  # [(k,v)] list of tuples
         self.log_term = list()  # []
         self.commitIndex = -1  # has been committed
@@ -58,14 +58,14 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         self.matchIndex = list()  # has been matched
         # TODO: call a function to properly initialize these variables
 
-        self.state = 0 # 0: follower, 1: candidate 2:leader
+        self.state = 0 # 0: follower, 1: candidate 2: leader
         self.leaderIndex = 0
         self.logger = self.set_log()
         self.last_commit_history = dict()  # client_id -> (serial_no, result)
         self.ae_succeed_cnt = 0
         self.apply_thread = None
         self.is_leader = (self.node_index == 0)
-        self.init_states()
+        self.start()
 
     def init_states(self):
         log_size = len(self.log)
@@ -78,10 +78,32 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         else:
             self.revoke_apply_thread()
 
-    def run_heartbeat_timer(self):
+    def start(self):
+        history = self.load_history()
+        if not history:
+            self.logger.info("No history states stored locally")
+            self.init_states()
+            self.set_election_timer()
+        else:
+            self.voteFor = history['voteFor']
+            self.state = history['state']
+            self.term = int(history['term'])
+            self.log = history['log']
+
+            if self.state == 2:
+                # was a leader in the previous state
+                self.set_heartbeat_timer()
+            else:
+                # was a follower or a candidate in history
+                self.set_election_timer()
+
+    def get_persist_path(self):
+        return "{}_{}_persistent.txt".format(PERSISTENT_PATH_PREFIC, self.node_index)
+
+    def set_heartbeat_timer(self):
         self.heartbeat_once_to_all()
 
-        self.heartbeat_timer = threading.Timer(float(self.configs['heartbeat_timeout']), self.run_heartbeat_timer)
+        self.heartbeat_timer = threading.Timer(float(self.configs['heartbeat_timeout']), self.set_heartbeat_timer)
         self.heartbeat_timer.start()
 
     def set_election_timer(self):
@@ -412,11 +434,37 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         self.currentTerm = request.term # 存疑，是否应该加
         return storage_service_pb2.RequestVoteResponse(term=self.currentTerm, voteGranted=True)
 
-    def persist(self, state_str):
+    def persist(self):
+        history = dict()
+        history['term'] = self.term
+        history['state'] = self.state
+        history['voteFor'] = self.voteFor
+        history['logTerm'] = self.log_term
+        history['log'] = self.log
+
+        history_str = str(history)
         with open(self.get_persist_path(), 'w') as f:
-            f.write(state_str)
+            f.write(history_str)
             f.flush()
             os.fsync(f.fileno())
+
+    def load_history(self):
+        # load history from  persistent file; check if the persistent file is valid
+        history = None
+        persistent_path = self.get_persist_path()
+        if os.path.isfile(persistent_path):
+            with open(persistent_path) as f:
+                history = eval(f.read())
+        return history
+
+    def to_string(self):
+        s = []
+        s.append("term: {}".format(self.term))
+        s.append("state: {}".format(self.state))
+        s.append("voteFor: {}".format(self.voteFor))
+        s.append("logTerm: {}".format(str(self.log_term)))
+        s.append("log: {}".format(str(self.log)))
+        return "\n".join(s)
 
 
 class ChaosServer(chaosmonkey_pb2_grpc.ChaosMonkeyServicer):
