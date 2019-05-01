@@ -1,6 +1,7 @@
 from concurrent import futures
 import time
 import sys
+import os
 import logging
 import threading
 import functools
@@ -22,6 +23,7 @@ lock_try_extend_commitIndex = threading.Lock()
 # The memory operations on voteFor, log[]/log_term[], and state, and their persistency is protected by a single lock
 
 conn_mat = None
+PERSISTENT_PATH_PREFIC = "/tmp/223b_raft_"
 
 
 def synchronized(lock):
@@ -48,8 +50,9 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         self.node_index = self.get_node_index_by_addr(myIp, myPort)
 
         self.currentTerm = 0
-        self.voteFor = 0
+        self.voteFor = None
         self.state = 0
+
         self.log = list()  # [(k,v)] list of tuples
         self.log_term = list()  # []
         self.commitIndex = -1  # has been committed
@@ -58,32 +61,70 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         self.matchIndex = list()  # has been matched
         # TODO: call a function to properly initialize these variables
 
+        self.state = 0 # 0: follower, 1: candidate 2: leader
         self.leaderIndex = 0
         self.logger = self.set_log()
-        self.last_commit_history = dict()  # client_id -> (serial_no, result)
-        self.apply_thread = None
         self.is_leader = (self.node_index == 0)
-        self.init_states()
+        self.last_commit_history = dict()  # client_id -> (serial_no, result)
+
+        self.ae_succeed_cnt = 0 
+
+        self.apply_thread = None
+        self.heartbeat_timer = None
+        self.election_timer = None
+        self.start()
+
+        self.state = 0  # 0: follower, 1: candidate 2: leader
+        self.heartbeat_timer = None # used for heartbeat only
+        self.timer = None # used for convert_to_candidate and requestVote periodically
+        self._lock = threading.Lock()
+        self.voteCnt = 0
 
     def init_states(self):
+        history = self.load_history()
+        if not history:
+            self.logger.info("No history states stored locally")
+        else:
+            self.logger.info("Recover from history with role: {}".format(self.state))
+            self.voteFor = history['voteFor']
+            self.state = history['state']
+            self.term = int(history['term'])
+            self.log = history['log']
+
         log_size = len(self.log)
         for i in range(len(self.configs['nodes'])):
             self.nextIndex.append(log_size)
             self.matchIndex.append(-1)
+
+    def start(self):
+        self.init_states()
         if self.is_leader:
             self.logger.info('This node is leader.')
-            self.run_heartbeat_timer()
+            self.set_heartbeat_timer()
         else:
+            self.set_election_timer()
             self.revoke_apply_thread()
 
-    def persistent(self):
-        pass
+    def get_persist_path(self):
+        return "{}_{}_persistent.txt".format(PERSISTENT_PATH_PREFIC, self.node_index)
 
-    def run_heartbeat_timer(self):
+    def set_heartbeat_timer(self):
         self.heartbeat_once_to_all()
-
-        self.heartbeat_timer = threading.Timer(float(self.configs['heartbeat_timeout']), self.run_heartbeat_timer)
+        self.heartbeat_timer = threading.Timer(float(self.configs['heartbeat_timeout']), self.set_heartbeat_timer)
         self.heartbeat_timer.start()
+
+    def set_election_timer(self):
+        self.election_timer = threading.Timer(self.get_random_timeout(), self.convert_to_candidate)
+        self.election_timer.start()
+
+    def cancel_election_timer(self):
+        if self.election_timer:
+            self.election_timer.cancel()
+
+    def reset_election_timer(self):
+        if self.elec.tion_timer:
+            self.election_timer.cancel()
+        self.set_election_timer()
 
     @synchronized(lock_persistent_operations)
     def append_to_local_log(self, key, value):
@@ -186,7 +227,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
                 self.logger.info('Heartbeat to {} succeeded.'.format(node_index))
             elif response.failed_for_term:
                 # TODO: step down to follower
-                pass
+                self.convert_to_follower(response.term)
             else:
                 # AppendEntries failed because of log inconsistency
                 if not is_sync_entry:
@@ -263,7 +304,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
                     ae_succeed_cnt[0] += 1
             elif response.failed_for_term:
                 # TODO: step down to follower
-                pass
+                self.convert_to_follower(response.term)
             else:
                 # AppendEntries failed because of log inconsistency
                 self.decrement_nextIndex(receiver_index)
@@ -365,6 +406,8 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
     def AppendEntries(self, request, context):
         self.logger.info('{} received AppendEntries call from node (term:{}, leaderId:{})'.format(
             self.node_index, request.term, request.leaderId))
+        
+        # print('Leader\'s commitIndex is: {}'.format(request.leaderCommit))
 
         # 1
         if request.term < self.currentTerm:
@@ -378,7 +421,9 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
                 term=self.currentTerm, success=False, failed_for_term=False)  # inconsistency
 
         # TODO: step down to follower
-        # 3
+        self.convert_to_follower(request.term)
+
+        # if candidate or leader then step down to follower
         i = len(self.log) - 1
         while i > request.prevLogIndex:
             self.log.pop(i)
@@ -393,8 +438,8 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         self.commitIndex = min(request.leaderCommit, len(self.log) - 1)
         return storage_service_pb2.AppendEntriesResponse(term=self.currentTerm, success=True)
 
-
     def RequestVote(self, request, context):
+        # TODO: need to modify RequestVote() according to Ling's exposed_request_vote()
         # 1
         if request.term < self.currentTerm:
             return storage_service_pb2.RequestVoteResponse(term=self.currentTerm, voteGranted=False)
@@ -405,10 +450,123 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
             or request.lastLogIndex <= len(self.log) - 1 and request.term > self.log_term[request.lastLogIndex]):
             return storage_service_pb2.RequestVoteResponse(term=self.currentTerm, voteGranted=False)
 
-        # TODO: step down to follower
+        # TODO: step down to follower, call convert_to_follower() and update configuration variables
         self.votedFor = request.candidateId
         self.currentTerm = request.term # 存疑，是否应该加
         return storage_service_pb2.RequestVoteResponse(term=self.currentTerm, voteGranted=True)
+
+    def persist(self):
+        history = dict()
+        history['term'] = self.term
+        history['state'] = self.state
+        history['voteFor'] = self.voteFor
+        history['logTerm'] = self.log_term
+        history['log'] = self.log
+
+        history_str = str(history)
+        with open(self.get_persist_path(), 'w') as f:
+            f.write(history_str)
+            f.flush()
+            os.fsync(f.fileno())
+
+    def load_history(self):
+        # load history from  persistent file; check if the persistent file is valid
+        history = None
+        persistent_path = self.get_persist_path()
+        if os.path.isfile(persistent_path):
+            with open(persistent_path) as f:
+                history = eval(f.read())
+        return history
+
+    def to_string(self):
+        s = []
+        s.append("term: {}".format(self.term))
+        s.append("state: {}".format(self.state))
+        s.append("voteFor: {}".format(self.voteFor))
+        s.append("logTerm: {}".format(str(self.log_term)))
+        s.append("log: {}".format(str(self.log)))
+        return "\n".join(s)
+
+    def convert_to_follower(self, term):
+        self.logger.info('{} converts to follower in term {}'.format(self.node_index, term))
+
+        # TODO: invoke Jie's stateIntnitialize function: currentTerm, count and persist, ensure atomization
+        self.update_state(0)
+        self.update_voteFor(None)
+
+        # TODO: voteCnt reset
+        self.persist()
+        self.reset_election_timer()
+        # if the previous state is leader, then set the timer
+        if self.heartbeat_timer:
+            self.heartbeat_timer.cancel()
+
+    def convert_to_candidate(self):
+        # TODO: increment term by 1, set voteCnt and state to 1, set voteFor to self.node_index
+        self.persist()
+        self.logger.info('{} converts to candidate in term {}'.format(self.node_index, self.currentTerm))
+        self.reset_election_timer()
+        self.ask_for_vote_to_all()
+
+    def convert_to_leader(self):
+        self.logger.info('{} converts to leader in term {}'.format(self.node_index, self.currentTerm))
+        # TODO: add cancel_election_timer() function
+        self.cancel_election_timer()
+        # TODO: set state to 2
+        self.persist()
+        # TODO: is run_heartbeat_timer() same as set_heart_beat() which is not defined
+        self.run_heartbeat_timer()
+
+
+    def ask_for_vote_to_all(self):
+        # send RPC requests to all other nodes
+        for t in self.configs['nodes']:
+            if t[0] == self.ip and t[1] == self.port:
+                continue
+            try:
+                node_index = self.get_node_index_by_addr(t[0], t[1])
+                requestVote_thread = threading.Thread(target=self.ask_for_vote_to_one, args=(t[0], t[1], node_index))
+                requestVote_thread.start()
+            except Exception as e:
+                self.logger.error("node{} in term {} ask_for_vote error".format(self.node_index, self.currentTerm))
+
+    def ask_for_vote_to_one(self, ip, port, node_index):
+        self.logger.info('{} ask vote from {} in term {}'.format(self.node_index, node_index, self.currentTerm))
+        # TODO: consider whether we need to consider the current state, 如果此时不是candidate，不requestVote
+        with grpc.insecure_channel(ip + ':' + port) as channel:
+            stub = storage_service_pb2_grpc.KeyValueStoreStub(channel)
+            request = self.generate_RequestVote_request()
+            try:
+                response = stub.RequestVote(request, timeout=float(self.configs['rpc_timeout']))
+            except Exception:
+                self.logger.error("Timeout error when requestVote to {}".format(node_index))
+                return
+            if response.term < self.currentTerm:
+                return
+            elif request.term > self.currentTerm:
+                self.convert_to_follower(request.term)
+            else:
+                if request.voteGranted:
+                    # TODO: increment voteCnt by 1
+                    #with self._lock:
+                    #    self.cnt += 1
+                    self.persist()
+                    self.logger.info("get one vote from node {}, current voteCnt is {}".format(node_index, self.voteCnt))
+                    majority_cnt = len(self.configs['nodes']) // 2 + 1
+                    if self.state != 2 and self.voteCnt >= majority_cnt:
+                        self.convert_to_leader()
+
+    def generate_RequestVote_request(self):
+        request = storage_service_pb2.RequestVoteRequest()
+        request.term = self.currentTerm
+        request.candidateId = self.node_index
+        # consider the length of log equal to 0, i.e., no entries in candidate's log.
+        request.lastLogIndex = len(self.log) - 1
+        if request.lastLogIndex < 0:
+            request.lastLogTerm = 0
+        else:
+            request.lastLogTerm = self.log_term[-1]
+        return request
 
 
 class ChaosServer(chaosmonkey_pb2_grpc.ChaosMonkeyServicer):
