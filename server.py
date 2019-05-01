@@ -231,7 +231,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
                 self.logger.info('Heartbeat to {} succeeded.'.format(node_index))
             elif response.failed_for_term:
                 # TODO: step down to follower
-                pass
+                self.convert_to_follower(response.term)
             else:
                 # AppendEntries failed because of log inconsistency
                 if not is_sync_entry:
@@ -308,7 +308,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
                     ae_succeed_cnt[0] += 1
             elif response.failed_for_term:
                 # TODO: step down to follower
-                pass
+                self.convert_to_follower(response.term)
             else:
                 # AppendEntries failed because of log inconsistency
                 self.decrement_nextIndex(receiver_index)
@@ -425,6 +425,8 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
                 term=self.currentTerm, success=False, failed_for_term=False)  # inconsistency
 
         # TODO: step down to follower
+        self.convert_to_follower(request.term)
+
         # if candidate or leader then step down to follower
         i = len(self.log) - 1
         while i > request.prevLogIndex:
@@ -452,7 +454,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
             or request.lastLogIndex <= len(self.log) - 1 and request.term > self.log_term[request.lastLogIndex]):
             return storage_service_pb2.RequestVoteResponse(term=self.currentTerm, voteGranted=False)
 
-        # TODO: step down to follower
+        # TODO: step down to follower, call convert_to_follower() and update configuration variables
         self.votedFor = request.candidateId
         self.currentTerm = request.term # 存疑，是否应该加
         return storage_service_pb2.RequestVoteResponse(term=self.currentTerm, voteGranted=True)
@@ -492,7 +494,10 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
     def convert_to_follower(self, term):
         self.logger.info('{} converts to follower in term {}'.format(self.node_index, term))
 
-        # TODO: invoke Jie's stateIntnitialize function: reset state, voteFor, term, count and persist
+        # TODO: invoke Jie's stateIntnitialize function: currentTerm, count and persist, ensure atomization
+        self.update_state(0)
+        self.update_voteFor(None)
+
         # TODO: voteCnt reset
         self.persist()
         self.reset_election_timer()
