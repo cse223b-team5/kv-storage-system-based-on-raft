@@ -121,7 +121,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
             self.election_timer.cancel()
 
     def reset_election_timer(self):
-        if self.election_timer:
+        if self.elec.tion_timer:
             self.election_timer.cancel()
         self.set_election_timer()
 
