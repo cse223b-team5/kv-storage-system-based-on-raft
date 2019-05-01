@@ -74,6 +74,9 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         else:
             self.revoke_apply_thread()
 
+    def persistent(self):
+        pass
+
     def run_heartbeat_timer(self):
         self.heartbeat_once_to_all()
 
@@ -85,7 +88,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         self.log.append((key, value))
         self.log_term.append(self.currentTerm)
         self.persistent()
-        print('Local log: ' + str(self.log))
+        print('(port:{})Local log: {}'.format(self.myPort, str(self.log)))
         
     @synchronized(lock_persistent_operations)
     def update_voteFor(self, new_voteFor):
