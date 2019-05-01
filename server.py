@@ -521,7 +521,6 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         # TODO: is run_heartbeat_timer() same as set_heart_beat() which is not defined
         self.run_heartbeat_timer()
 
-
     def ask_for_vote_to_all(self):
         # send RPC requests to all other nodes
         for t in self.configs['nodes']:
