@@ -5,6 +5,7 @@ package chaosmonkey;
 service ChaosMonkey {
     rpc UploadMatrix(ConnMatrix) returns (Status) {}
     rpc UpdateValue(MatValue) returns (Status) {}
+    rpc GetMatrix(Empty) returns (ConnMatrix) {}
 }
 
 enum StatusCode {
@@ -28,3 +29,5 @@ message MatValue {
     int32 col = 2;
     float val = 3;
 }
+
+message Empty {}

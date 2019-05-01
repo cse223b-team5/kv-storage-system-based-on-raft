@@ -9,7 +9,7 @@ import storage_service_pb2
 import storage_service_pb2_grpc
 import chaosmonkey_pb2
 import chaosmonkey_pb2_grpc
-from utils import load_config
+from utils import load_config, load_matrix
 from chaos_server import ChaosServer
 from logging import Logger, StreamHandler, Formatter
 
@@ -20,6 +20,8 @@ lock_try_extend_matchIndex = threading.Lock()
 lock_state_machine = threading.Lock()
 lock_try_extend_commitIndex = threading.Lock()
 # The memory operations on voteFor, log[]/log_term[], and state, and their persistency is protected by a single lock
+
+conn_mat = None
 
 
 def synchronized(lock):
@@ -410,19 +412,38 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
 
 
 class ChaosServer(chaosmonkey_pb2_grpc.ChaosMonkeyServicer):
+    def __init__(self):
+        global conn_mat
+        conn_mat = load_matrix('matrix')
+
     def UploadMatrix(self, request, context):
         global conn_mat
-        conn_mat = request
-        print('New ConnMat uploaded')
+
+        mat = list()
+        for row in request.rows:
+            to_row = list()
+            for e in row.vals:
+                to_row.append(e)
+            mat.append(to_row)
+
+        conn_mat = mat
         return chaosmonkey_pb2.Status(ret=0)
 
     def UpdateValue(self, request, context):
         global conn_mat
-        if request.row >= len(conn_mat.rows) or request.col >= len(conn_mat.rows[request.row].vals):
+        if request.row >= len(conn_mat) or request.col >= len(conn_mat):
             return chaosmonkey_pb2.Status(ret=1)
-        conn_mat.rows[request.row].vals[request.col] = request.val
-        print('New edit to ConnMat')
+        conn_mat[request.row][request.col] = request.val
         return chaosmonkey_pb2.Status(ret=0)
+
+    def GetMatrix(self, request, context):
+        global conn_mat
+        to_mat = chaosmonkey_pb2.ConnMatrix()
+        for from_row in conn_mat:
+            to_row = to_mat.rows.add()
+            for element in from_row:
+                to_row.vals.append(element)
+        return to_mat
 
 
 def serve(config_path, myIp, myPort):
