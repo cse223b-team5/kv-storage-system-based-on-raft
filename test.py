@@ -175,8 +175,9 @@ while time.time() - start < SIMULATION_DURATION:
         update_get_stats(ret)
         no_of_get += 1
 
-    report_get_stats(duration*0.5, no_of_put)
-    report_put_stats(duration*0.5, no_of_get)
+    print('{} PUT and {} GET are performed, total elapsed time: {}ms'.format(no_of_put, no_of_get, int(duration*1000)))
+    report_put_stats(duration*0.5, no_of_put)
+    report_get_stats(duration*0.5, no_of_get)
 
     if node_killed == -1:
         # no node is killed, so now kill one
@@ -194,7 +195,5 @@ while time.time() - start < SIMULATION_DURATION:
             node_killed = -1
         else:
             print('Node {} cannot be revived.'.format(node_killed))
-
-
 print('---------------------------------------------------------------------')
 
