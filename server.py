@@ -62,61 +62,57 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         self.state = 0 # 0: follower, 1: candidate 2: leader
         self.leaderIndex = 0
         self.logger = self.set_log()
+        self.is_leader = (self.node_index == 0)
         self.last_commit_history = dict()  # client_id -> (serial_no, result)
         self.apply_thread = None
-        self.is_leader = (self.node_index == 0)
+        self.heartbeat_timer = None
+        self.election_timer = None
         self.start()
 
     def init_states(self):
-        log_size = len(self.log)
-        for i in range(len(self.configs['nodes'])):
-            self.nextIndex.append(log_size)
-            self.matchIndex.append(-1)
-        if self.is_leader:
-            self.logger.info('This node is leader.')
-            self.run_heartbeat_timer()
-        else:
-            self.revoke_apply_thread()
-
-    def start(self):
         history = self.load_history()
         if not history:
             self.logger.info("No history states stored locally")
-            self.init_states()
-            self.set_election_timer()
         else:
+            self.logger.info("Recover from history with role: {}".format(self.state))
             self.voteFor = history['voteFor']
             self.state = history['state']
             self.term = int(history['term'])
             self.log = history['log']
 
-            if self.state == 2:
-                # was a leader in the previous state
-                self.set_heartbeat_timer()
-            else:
-                # was a follower or a candidate in history
-                self.set_election_timer()
+        log_size = len(self.log)
+        for i in range(len(self.configs['nodes'])):
+            self.nextIndex.append(log_size)
+            self.matchIndex.append(-1)
+
+    def start(self):
+        self.init_states()
+        if self.is_leader:
+            self.logger.info('This node is leader.')
+            self.set_heartbeat_timer()
+        else:
+            self.set_election_timer()
+            self.revoke_apply_thread()
 
     def get_persist_path(self):
         return "{}_{}_persistent.txt".format(PERSISTENT_PATH_PREFIC, self.node_index)
 
     def set_heartbeat_timer(self):
         self.heartbeat_once_to_all()
-
         self.heartbeat_timer = threading.Timer(float(self.configs['heartbeat_timeout']), self.set_heartbeat_timer)
         self.heartbeat_timer.start()
 
     def set_election_timer(self):
-        self.timer = threading.Timer(self.get_random_timeout(), self.convert_to_candidate)
-        self.timer.start()
+        self.election_timer = threading.Timer(self.get_random_timeout(), self.convert_to_candidate)
+        self.election_timer.start()
 
     def cancel_election_timer(self):
-        if self.timer:
-            self.timer.cancel()
+        if self.election_timer:
+            self.election_timer.cancel()
 
     def reset_election_timer(self):
-        if self.timer:
-            self.timer.cancel()
+        if self.election_timer:
+            self.election_timer.cancel()
         self.set_election_timer()
 
     @synchronized(lock_persistent_operations)
@@ -124,7 +120,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         self.log.append((key, value))
         self.log_term.append(self.currentTerm)
         self.persistent()
-        print('Local log: ' + str(self.log))
+        # print('(port:{})Local log: {}'.format(self.myPort, str(self.log)))
         
     @synchronized(lock_persistent_operations)
     def update_voteFor(self, new_voteFor):
@@ -294,7 +290,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
                 self.update_nextIndex_and_matchIndex(receiver_index, new_nextIndex)
                 # increment ae_succeed_cnt
                 with lock_ae_succeed_cnt:
-                    ae_succeed_cnt += 1
+                    ae_succeed_cnt[0] += 1
             elif response.failed_for_term:
                 # TODO: step down to follower
                 pass
@@ -328,16 +324,17 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
 
         self.append_to_local_log(request.key, request.value)
 
-        ae_succeed_cnt = 0
+        ae_succeed_cnt = list()
+        ae_succeed_cnt.append(0)  # use list so that when pass-by-reference
         self.replicate_log_entries_to_all(ae_succeed_cnt)
 
         majority_cnt = len(self.configs['nodes']) // 2 + 1
-        while ae_succeed_cnt < majority_cnt:
+        while ae_succeed_cnt[0] < majority_cnt:
             if not self.check_is_leader():
                 return storage_service_pb2.PutResponse(ret=1)
             continue
 
-        if ae_succeed_cnt < majority_cnt:
+        if ae_succeed_cnt[0] < majority_cnt:
             # client request failed
             return storage_service_pb2.PutResponse(ret=1)
 
@@ -424,7 +421,6 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
 
         # 5
         self.commitIndex = min(request.leaderCommit, len(self.log) - 1)
-
         return storage_service_pb2.AppendEntriesResponse(term=self.currentTerm, success=True)
 
 
