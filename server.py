@@ -24,7 +24,7 @@ lock_update_vote_cnt = threading.Lock()
 # The memory operations on voteFor, log[]/log_term[], and state, and their persistency is protected by a single lock
 
 conn_mat = None
-PERSISTENT_PATH_PREFIC = "/tmp/223b_raft_"
+PERSISTENT_PATH_PREFIX = "/tmp/223b_raft_"
 
 
 def synchronized(lock):
@@ -99,7 +99,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
             self.revoke_apply_thread()
 
     def get_persist_path(self):
-        return "{}_{}_persistent.txt".format(PERSISTENT_PATH_PREFIC, self.node_index)
+        return "{}_{}_persistent.txt".format(PERSISTENT_PATH_PREFIX, self.node_index)
 
     def set_heartbeat_timer(self):
         self.heartbeat_once_to_all()
@@ -451,14 +451,12 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         self.commitIndex = min(request.leaderCommit, len(self.log) - 1)
 
         # TODO: step down to follower
-
         if self.state != 0:
             self.convert_to_follower(request.term)
         return storage_service_pb2.AppendEntriesResponse(term=self.currentTerm, success=True)
 
     @synchronized(lock_persistent_operations)
     def RequestVote(self, request, context):
-        # TODO: need to modify RequestVote() according to Ling's exposed_request_vote()
         # 1
         if request.term < self.currentTerm:
             return storage_service_pb2.RequestVoteResponse(term=self.currentTerm, voteGranted=False)
@@ -477,7 +475,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         if request.term > self.currentTerm and self.state != 0:
             self.convert_to_follower(request.term, False)
 
-        self.votedFor = request.candidateId
+        self.voteFor = request.candidateId
         self.persist()
         return storage_service_pb2.RequestVoteResponse(term=self.currentTerm, voteGranted=True)
 
@@ -528,9 +526,13 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         if self.heartbeat_timer:
             self.heartbeat_timer.cancel()
 
-
+    @synchronized(lock_persistent_operations)
     def convert_to_candidate(self):
         # TODO: increment term by 1, set voteCnt and state to 1, set voteFor to self.node_index
+        self.state = 1
+        self.voteFor = self.node_index
+        self.term += 1
+        self.voteCnt = 1
 
         self.persist()
         self.logger.info('{} converts to candidate in term {}'.format(self.node_index, self.currentTerm))
@@ -542,6 +544,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         # TODO: add cancel_election_timer() function
         self.cancel_election_timer()
         # TODO: set state to 2
+        self.state = 2
         self.persist()
         # TODO: is run_heartbeat_timer() same as set_heart_beat() which is not defined
         self.set_heartbeat_timer()
@@ -560,7 +563,6 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
 
     def ask_for_vote_to_one(self, ip, port, node_index):
         self.logger.info('{} ask vote from {} in term {}'.format(self.node_index, node_index, self.currentTerm))
-        # TODO: consider whether we need to consider the current state, 如果此时不是candidate，不requestVote
         with grpc.insecure_channel(ip + ':' + port) as channel:
             stub = storage_service_pb2_grpc.KeyValueStoreStub(channel)
             request = self.generate_RequestVote_request()
@@ -577,7 +579,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
                 if request.voteGranted:
                     # TODO: increment voteCnt by 1
                     #with self._lock:
-                    #    self.cnt += 1
+                    self.cnt += 1
                     self.persist()
                     self.logger.info("get one vote from node {}, current voteCnt is {}".format(node_index, self.voteCnt))
                     majority_cnt = len(self.configs['nodes']) // 2 + 1
