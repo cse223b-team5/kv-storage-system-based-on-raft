@@ -88,7 +88,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         self.log.append((key, value))
         self.log_term.append(self.currentTerm)
         self.persistent()
-        print('(port:{})Local log: {}'.format(self.myPort, str(self.log)))
+        # print('(port:{})Local log: {}'.format(self.myPort, str(self.log)))
         
     @synchronized(lock_persistent_operations)
     def update_voteFor(self, new_voteFor):
@@ -258,7 +258,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
                 self.update_nextIndex_and_matchIndex(receiver_index, new_nextIndex)
                 # increment ae_succeed_cnt
                 with lock_ae_succeed_cnt:
-                    ae_succeed_cnt += 1
+                    ae_succeed_cnt[0] += 1
             elif response.failed_for_term:
                 # TODO: step down to follower
                 pass
@@ -292,16 +292,17 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
 
         self.append_to_local_log(request.key, request.value)
 
-        ae_succeed_cnt = 0
+        ae_succeed_cnt = list()
+        ae_succeed_cnt.append(0)  # use list so that when pass-by-reference
         self.replicate_log_entries_to_all(ae_succeed_cnt)
 
         majority_cnt = len(self.configs['nodes']) // 2 + 1
-        while ae_succeed_cnt < majority_cnt:
+        while ae_succeed_cnt[0] < majority_cnt:
             if not self.check_is_leader():
                 return storage_service_pb2.PutResponse(ret=1)
             continue
 
-        if ae_succeed_cnt < majority_cnt:
+        if ae_succeed_cnt[0] < majority_cnt:
             # client request failed
             return storage_service_pb2.PutResponse(ret=1)
 
@@ -388,7 +389,6 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
 
         # 5
         self.commitIndex = min(request.leaderCommit, len(self.log) - 1)
-
         return storage_service_pb2.AppendEntriesResponse(term=self.currentTerm, success=True)
 
 

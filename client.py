@@ -6,6 +6,8 @@ import storage_service_pb2
 import storage_service_pb2_grpc
 from utils import load_config
 
+PRINT_RESULT = False
+
 
 class Client:
     def __init__(self, config_path):
@@ -75,16 +77,19 @@ class Client:
         for _ in range(3):
             once_ret = self.put_once(key, value)
             if once_ret[0] == 0:
-                print('Success!')
+                if PRINT_RESULT:
+                    print('Success!')
                 return 0
             elif once_ret[0] == 1:
                 self.leader_ip, self.leader_port = once_ret[1]
                 continue
             elif once_ret[0] == 2:
-                print('Unknown error!')
+                if PRINT_RESULT:
+                    print('Unknown error!')
                 return 1
             else:
-                print('Connection failed!')
+                if PRINT_RESULT:
+                    print('Connection failed!')
                 return 2
         return 3
 
@@ -100,20 +105,24 @@ class Client:
         for _ in range(3):
             once_ret = self.get_once(key)
             if once_ret[0] == 0:
-                print(once_ret[1])
+                if PRINT_RESULT:
+                    print(once_ret[1])
                 return 0, once_ret[1]
             elif once_ret[0] == 1:
                 # redirect
                 self.leader_ip, self.leader_port = once_ret[2]
                 continue
             elif once_ret[0] == 2:
-                print('Key doesn\'t exist!')
+                if PRINT_RESULT:
+                    print('Key doesn\'t exist!')
                 return 1, 0
             elif once_ret[0] == 3:
-                print('Unknown error!')
+                if PRINT_RESULT:
+                    print('Unknown error!')
                 return 2, 0
             else:
-                print('Connection failed!')
+                if PRINT_RESULT:
+                    print('Connection failed!')
                 return 3, 0
         return 4, 0
 
