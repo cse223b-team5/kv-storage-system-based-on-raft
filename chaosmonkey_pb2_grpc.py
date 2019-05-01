@@ -24,6 +24,11 @@ class ChaosMonkeyStub(object):
         request_serializer=chaosmonkey__pb2.MatValue.SerializeToString,
         response_deserializer=chaosmonkey__pb2.Status.FromString,
         )
+    self.GetMatrix = channel.unary_unary(
+        '/chaosmonkey.ChaosMonkey/GetMatrix',
+        request_serializer=chaosmonkey__pb2.Empty.SerializeToString,
+        response_deserializer=chaosmonkey__pb2.ConnMatrix.FromString,
+        )
 
 
 class ChaosMonkeyServicer(object):
@@ -44,6 +49,13 @@ class ChaosMonkeyServicer(object):
     context.set_details('Method not implemented!')
     raise NotImplementedError('Method not implemented!')
 
+  def GetMatrix(self, request, context):
+    # missing associated documentation comment in .proto file
+    pass
+    context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+    context.set_details('Method not implemented!')
+    raise NotImplementedError('Method not implemented!')
+
 
 def add_ChaosMonkeyServicer_to_server(servicer, server):
   rpc_method_handlers = {
@@ -56,6 +68,11 @@ def add_ChaosMonkeyServicer_to_server(servicer, server):
           servicer.UpdateValue,
           request_deserializer=chaosmonkey__pb2.MatValue.FromString,
           response_serializer=chaosmonkey__pb2.Status.SerializeToString,
+      ),
+      'GetMatrix': grpc.unary_unary_rpc_method_handler(
+          servicer.GetMatrix,
+          request_deserializer=chaosmonkey__pb2.Empty.FromString,
+          response_serializer=chaosmonkey__pb2.ConnMatrix.SerializeToString,
       ),
   }
   generic_handler = grpc.method_handlers_generic_handler(

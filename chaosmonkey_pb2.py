@@ -20,7 +20,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   package='chaosmonkey',
   syntax='proto3',
   serialized_options=None,
-  serialized_pb=_b('\n\x11\x63haosmonkey.proto\x12\x0b\x63haosmonkey\".\n\x06Status\x12$\n\x03ret\x18\x01 \x01(\x0e\x32\x17.chaosmonkey.StatusCode\"R\n\nConnMatrix\x12,\n\x04rows\x18\x01 \x03(\x0b\x32\x1e.chaosmonkey.ConnMatrix.MatRow\x1a\x16\n\x06MatRow\x12\x0c\n\x04vals\x18\x01 \x03(\x02\"1\n\x08MatValue\x12\x0b\n\x03row\x18\x01 \x01(\x05\x12\x0b\n\x03\x63ol\x18\x02 \x01(\x05\x12\x0b\n\x03val\x18\x03 \x01(\x02*\x1f\n\nStatusCode\x12\x06\n\x02OK\x10\x00\x12\t\n\x05\x45RROR\x10\x01\x32\x8a\x01\n\x0b\x43haosMonkey\x12>\n\x0cUploadMatrix\x12\x17.chaosmonkey.ConnMatrix\x1a\x13.chaosmonkey.Status\"\x00\x12;\n\x0bUpdateValue\x12\x15.chaosmonkey.MatValue\x1a\x13.chaosmonkey.Status\"\x00\x62\x06proto3')
+  serialized_pb=_b('\n\x11\x63haosmonkey.proto\x12\x0b\x63haosmonkey\".\n\x06Status\x12$\n\x03ret\x18\x01 \x01(\x0e\x32\x17.chaosmonkey.StatusCode\"R\n\nConnMatrix\x12,\n\x04rows\x18\x01 \x03(\x0b\x32\x1e.chaosmonkey.ConnMatrix.MatRow\x1a\x16\n\x06MatRow\x12\x0c\n\x04vals\x18\x01 \x03(\x02\"1\n\x08MatValue\x12\x0b\n\x03row\x18\x01 \x01(\x05\x12\x0b\n\x03\x63ol\x18\x02 \x01(\x05\x12\x0b\n\x03val\x18\x03 \x01(\x02\"\x07\n\x05\x45mpty*\x1f\n\nStatusCode\x12\x06\n\x02OK\x10\x00\x12\t\n\x05\x45RROR\x10\x01\x32\xc6\x01\n\x0b\x43haosMonkey\x12>\n\x0cUploadMatrix\x12\x17.chaosmonkey.ConnMatrix\x1a\x13.chaosmonkey.Status\"\x00\x12;\n\x0bUpdateValue\x12\x15.chaosmonkey.MatValue\x1a\x13.chaosmonkey.Status\"\x00\x12:\n\tGetMatrix\x12\x12.chaosmonkey.Empty\x1a\x17.chaosmonkey.ConnMatrix\"\x00\x62\x06proto3')
 )
 
 _STATUSCODE = _descriptor.EnumDescriptor(
@@ -40,8 +40,8 @@ _STATUSCODE = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=217,
-  serialized_end=248,
+  serialized_start=226,
+  serialized_end=257,
 )
 _sym_db.RegisterEnumDescriptor(_STATUSCODE)
 
@@ -187,12 +187,37 @@ _MATVALUE = _descriptor.Descriptor(
   serialized_end=215,
 )
 
+
+_EMPTY = _descriptor.Descriptor(
+  name='Empty',
+  full_name='chaosmonkey.Empty',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=217,
+  serialized_end=224,
+)
+
 _STATUS.fields_by_name['ret'].enum_type = _STATUSCODE
 _CONNMATRIX_MATROW.containing_type = _CONNMATRIX
 _CONNMATRIX.fields_by_name['rows'].message_type = _CONNMATRIX_MATROW
 DESCRIPTOR.message_types_by_name['Status'] = _STATUS
 DESCRIPTOR.message_types_by_name['ConnMatrix'] = _CONNMATRIX
 DESCRIPTOR.message_types_by_name['MatValue'] = _MATVALUE
+DESCRIPTOR.message_types_by_name['Empty'] = _EMPTY
 DESCRIPTOR.enum_types_by_name['StatusCode'] = _STATUSCODE
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
@@ -225,6 +250,13 @@ MatValue = _reflection.GeneratedProtocolMessageType('MatValue', (_message.Messag
   ))
 _sym_db.RegisterMessage(MatValue)
 
+Empty = _reflection.GeneratedProtocolMessageType('Empty', (_message.Message,), dict(
+  DESCRIPTOR = _EMPTY,
+  __module__ = 'chaosmonkey_pb2'
+  # @@protoc_insertion_point(class_scope:chaosmonkey.Empty)
+  ))
+_sym_db.RegisterMessage(Empty)
+
 
 
 _CHAOSMONKEY = _descriptor.ServiceDescriptor(
@@ -233,8 +265,8 @@ _CHAOSMONKEY = _descriptor.ServiceDescriptor(
   file=DESCRIPTOR,
   index=0,
   serialized_options=None,
-  serialized_start=251,
-  serialized_end=389,
+  serialized_start=260,
+  serialized_end=458,
   methods=[
   _descriptor.MethodDescriptor(
     name='UploadMatrix',
@@ -252,6 +284,15 @@ _CHAOSMONKEY = _descriptor.ServiceDescriptor(
     containing_service=None,
     input_type=_MATVALUE,
     output_type=_STATUS,
+    serialized_options=None,
+  ),
+  _descriptor.MethodDescriptor(
+    name='GetMatrix',
+    full_name='chaosmonkey.ChaosMonkey.GetMatrix',
+    index=2,
+    containing_service=None,
+    input_type=_EMPTY,
+    output_type=_CONNMATRIX,
     serialized_options=None,
   ),
 ])

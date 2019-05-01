@@ -1,20 +1,38 @@
-from concurrent import futures
-import time
-import sys
-import logging
-import grpc
 import chaosmonkey_pb2
 import chaosmonkey_pb2_grpc
+from utils import load_matrix
 
 
 class ChaosServer(chaosmonkey_pb2_grpc.ChaosMonkeyServicer):
+    def __init__(self):
+        global conn_mat
+        conn_mat = load_matrix('matrix')
+
     def UploadMatrix(self, request, context):
-        self.conn_mat = request
+        global conn_mat
+
+        mat = list()
+        for row in request.rows:
+            to_row = list()
+            for e in row.vals:
+                to_row.append(e)
+            mat.append(to_row)
+
+        conn_mat = mat
         return chaosmonkey_pb2.Status(ret=0)
 
     def UpdateValue(self, request, context):
-        if request.row >= len(self.conn_mat.rows) or request.col >= len(self.conn_mat.rows[request.row].vals):
+        global conn_mat
+        if request.row >= len(conn_mat) or request.col >= len(conn_mat):
             return chaosmonkey_pb2.Status(ret=1)
-
-        self.conn_mat.rows[request.row].vals[request.col] = request.val
+        conn_mat[request.row][request.col] = request.val
         return chaosmonkey_pb2.Status(ret=0)
+
+    def GetMatrix(self, request, context):
+        global conn_mat
+        to_mat = chaosmonkey_pb2.ConnMatrix()
+        for from_row in conn_mat:
+            to_row = to_mat.rows.add()
+            for element in from_row:
+                to_row.vals.append(element)
+        return to_mat
