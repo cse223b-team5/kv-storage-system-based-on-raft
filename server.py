@@ -23,7 +23,7 @@ lock_try_extend_commitIndex = threading.Lock()
 # The memory operations on voteFor, log[]/log_term[], and state, and their persistency is protected by a single lock
 
 conn_mat = None
-PERSISTENT_PATH_PREFIC = "/tmp/223b_raft_"
+PERSISTENT_PATH_PREFIX = "/tmp/223b_raft_"
 
 
 def synchronized(lock):
@@ -106,7 +106,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
             self.revoke_apply_thread()
 
     def get_persist_path(self):
-        return "{}_{}_persistent.txt".format(PERSISTENT_PATH_PREFIC, self.node_index)
+        return "{}_{}_persistent.txt".format(PERSISTENT_PATH_PREFIX, self.node_index)
 
     def set_heartbeat_timer(self):
         self.heartbeat_once_to_all()
@@ -420,9 +420,6 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
             return storage_service_pb2.AppendEntriesResponse(
                 term=self.currentTerm, success=False, failed_for_term=False)  # inconsistency
 
-        # TODO: step down to follower
-        self.convert_to_follower(request.term)
-
         # if candidate or leader then step down to follower
         i = len(self.log) - 1
         while i > request.prevLogIndex:
@@ -436,6 +433,10 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
 
         # 5
         self.commitIndex = min(request.leaderCommit, len(self.log) - 1)
+
+        # TODO: step down to follower
+        self.convert_to_follower(request.term)
+
         return storage_service_pb2.AppendEntriesResponse(term=self.currentTerm, success=True)
 
     def RequestVote(self, request, context):
