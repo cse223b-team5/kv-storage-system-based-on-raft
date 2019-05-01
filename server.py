@@ -20,6 +20,7 @@ lock_try_extend_nextIndex = threading.Lock()
 lock_try_extend_matchIndex = threading.Lock()
 lock_state_machine = threading.Lock()
 lock_try_extend_commitIndex = threading.Lock()
+lock_update_vote_cnt = threading.Lock()
 # The memory operations on voteFor, log[]/log_term[], and state, and their persistency is protected by a single lock
 
 PERSISTENT_PATH_PREFIC = "/tmp/223b_raft_"
@@ -44,40 +45,32 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         self.configs = load_config(config_path)
         self.myIp = myIp
         self.myPort = myPort
-        self.storage = {}
-        self.term = 0
-        self.node_index = self.get_node_index_by_addr(myIp, myPort)
-
-        self.currentTerm = 0
+        self.state = 0 # 0: follower, 1: candidate 2: leader
         self.voteFor = None
-        self.state = 0
-
-        self.log = list()  # [(k,v)] list of tuples
-        self.log_term = list()  # []
+        self.currentTerm = 0
+        self.node_index = self.get_node_index_by_addr(myIp, myPort)
         self.commitIndex = -1  # has been committed
         self.lastApplied = 0
+
+        self.storage = {}
+        self.log = list()  # [(k,v)] list of tuples
+        self.log_term = list()  # []
         self.nextIndex = list()  # has not yet been appended
         self.matchIndex = list()  # has been matched
-        # TODO: call a function to properly initialize these variables
 
-        self.state = 0 # 0: follower, 1: candidate 2: leader
         self.leaderIndex = 0
-        self.logger = self.set_log()
         self.is_leader = (self.node_index == 0)
         self.last_commit_history = dict()  # client_id -> (serial_no, result)
-
-        self.ae_succeed_cnt = 0 
-
-        self.apply_thread = None
-        self.heartbeat_timer = None
-        self.election_timer = None
-        self.start()
-
-        self.state = 0  # 0: follower, 1: candidate 2: leader
-        self.heartbeat_timer = None # used for heartbeat only
-        self.timer = None # used for convert_to_candidate and requestVote periodically
-        self._lock = threading.Lock()
+        self.ae_succeed_cnt = 0
         self.voteCnt = 0
+
+        self.logger = self.set_log()
+        self.apply_thread = None
+        self.heartbeat_timer = None  # used for convert_to_candidate and requestVote periodically
+        self.election_timer = None # used for convert_to_candidate and requestVote periodically
+        self._lock = threading.Lock()
+
+        self.start()
 
     def init_states(self):
         history = self.load_history()
@@ -87,7 +80,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
             self.logger.info("Recover from history with role: {}".format(self.state))
             self.voteFor = history['voteFor']
             self.state = history['state']
-            self.term = int(history['term'])
+            self.currentTerm = int(history['term'])
             self.log = history['log']
 
         log_size = len(self.log)
@@ -125,22 +118,34 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
             self.election_timer.cancel()
         self.set_election_timer()
 
-    @synchronized(lock_persistent_operations)
     def append_to_local_log(self, key, value):
         self.log.append((key, value))
         self.log_term.append(self.currentTerm)
-        self.persistent()
+        self.persist()
         # print('(port:{})Local log: {}'.format(self.myPort, str(self.log)))
         
     @synchronized(lock_persistent_operations)
     def update_voteFor(self, new_voteFor):
-        self.voteFor = new_voteFor
-        self.persistent()
+        if not self.voteFor:
+            self.voteFor = new_voteFor
+            self.persist()
 
     @synchronized(lock_persistent_operations)
     def update_state(self, new_state):
         self.state = new_state
-        self.persistent()
+        self.persist()
+
+    @synchronized(lock_persistent_operations)
+    def update_term(self, currentTerm):
+        self.currentTerm = currentTerm
+        self.persist()
+
+    @synchronized(lock_update_vote_cnt)
+    def update_vote_cnt(self, reset=False):
+        if reset:
+            self.voteCnt = 0
+        else:
+            self.voteCnt += 1
 
     @synchronized(lock_decrement_nextIndex)
     def decrement_nextIndex(self, node_index):
@@ -454,7 +459,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
 
     def persist(self):
         history = dict()
-        history['term'] = self.term
+        history['term'] = self.currentTerm
         history['state'] = self.state
         history['voteFor'] = self.voteFor
         history['logTerm'] = self.log_term
@@ -477,7 +482,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
 
     def to_string(self):
         s = []
-        s.append("term: {}".format(self.term))
+        s.append("term: {}".format(self.currentTerm))
         s.append("state: {}".format(self.state))
         s.append("voteFor: {}".format(self.voteFor))
         s.append("logTerm: {}".format(str(self.log_term)))
