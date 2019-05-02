@@ -79,3 +79,11 @@ message DEBUG_GetVariable_Resquest {
 message DEBUG_GetVariable_Response {
     string value = 1;
 }
+
+message Empty {
+
+}
+
+message Leader {
+    int32 leaderId = 1;
+}

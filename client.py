@@ -126,6 +126,18 @@ class Client:
                 return 3, 0
         return 4, 0
 
+    def get_leader(self):
+        # return leader_index, leader_ip, leader_port
+        #   if_succeed: 0 for succeeded, 1 for failed
+        # IMPORTANT: the leader this function returns might expire at the time it is returned.
+        # If this function is called right after a Put/Get operation, it is expected that the leader is very up-to-date.
+        leader_index = 0
+        for ip, port in self.configs['nodes']:
+            if ip == self.leader_ip and port == self.leader_port:
+                break
+            leader_index += 1
+        return leader_index, self.leader_ip, self.leader_port
+
 
 if __name__ == '__main__':
     logging.basicConfig()

@@ -4,6 +4,7 @@ import sys
 import os
 import logging
 import threading
+import random
 import functools
 import grpc
 import storage_service_pb2
@@ -11,7 +12,6 @@ import storage_service_pb2_grpc
 import chaosmonkey_pb2
 import chaosmonkey_pb2_grpc
 from utils import load_config, load_matrix
-from chaos_server import ChaosServer
 from logging import Logger, StreamHandler, Formatter
 
 lock_persistent_operations = threading.Lock()
@@ -35,6 +35,22 @@ def synchronized(lock):
                 return f(*args, **kw)
         return new_function
     return wrap
+
+
+# Note: This function is not used for RPC calls by ChaosMonkey client. It is only used among storage servers/clients.
+def network(func):
+    def wrapper_network(obj, request, context):
+        src = obj.get_node_id_by_ipv6(context.peer())
+        dest = obj.node_index
+
+        threshold = float(conn_mat[src][dest])
+        if random.random() < threshold:
+            # drop this message
+            time.sleep(1.5)
+            return func(obj, None, context)
+        else:
+            return func(obj, request, context)
+    return wrapper_network
 
 
 _ONE_DAY_IN_SECONDS = 60 * 60 * 24
@@ -183,6 +199,15 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         port = self.configs['nodes'][self.leaderIndex][1]
         return ip, port
 
+    def get_node_id_by_ipv6(self, ip):
+        target_port = ip.split(':')[-1]
+        index = 0
+        for ip, port in self.configs['nodes']:
+            if port == target_port:
+                break
+            index += 1
+        return index
+
     def DEBUG_GetVariable(self, request, context):
         response = storage_service_pb2.DEBUG_GetVariable_Response()
 
@@ -199,7 +224,11 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
 
         return response
 
+    @network
     def Get(self, request, context):
+        if request is None:
+            return storage_service_pb2.GetResponse(ret=1)
+
         if not self.check_is_leader():
             ip, port = self.get_leader_ip_port()
             return storage_service_pb2.GetResponse(leader_ip=ip, leader_port=port, ret=1)
@@ -318,7 +347,11 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
                     args=(ip_port_tuple[0], ip_port_tuple[1], node_index, ae_succeed_cnt, lock_ae_succeed_cnt))
                 ae_thread.start()
 
+    @network
     def Put(self, request, context):
+        if request is None:
+            return storage_service_pb2.PutResponse(ret=1)
+
         #  check if current node is leader. if not, help client redirect
         if not self.check_is_leader():
             ip = self.configs['nodes'][self.leaderIndex][0]
@@ -402,8 +435,12 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         if not self.apply_thread:
             self.apply_thread = threading.Thread(target=self.apply, args=())
         self.apply_thread.start()
-        
+
+    @network
     def AppendEntries(self, request, context):
+        if request is None:
+            return storage_service_pb2.AppendEntriesResponse(success=False)
+
         self.logger.info('{} received AppendEntries call from node (term:{}, leaderId:{})'.format(
             self.node_index, request.term, request.leaderId))
         
@@ -438,7 +475,11 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         self.commitIndex = min(request.leaderCommit, len(self.log) - 1)
         return storage_service_pb2.AppendEntriesResponse(term=self.currentTerm, success=True)
 
+    @network
     def RequestVote(self, request, context):
+        if request is None:
+            return storage_service_pb2.RequestVoteResponse(voteGranted=False)
+
         # TODO: need to modify RequestVote() according to Ling's exposed_request_vote()
         # 1
         if request.term < self.currentTerm:
@@ -516,7 +557,6 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         self.persist()
         # TODO: is run_heartbeat_timer() same as set_heart_beat() which is not defined
         self.run_heartbeat_timer()
-
 
     def ask_for_vote_to_all(self):
         # send RPC requests to all other nodes

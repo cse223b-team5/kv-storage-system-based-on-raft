@@ -42,21 +42,20 @@ class ChaosMonkey():
     def get_current_connMatrix(self):
         # return if_succeed, matrix
         #   if_succeed: 0 for succeeded, 1 for failed
-        # since all nodes are alive (even 'killed'), just ask one node and you'll get the matrix
-        ip, port = self.configs['nodes'][0]
-        try:
-            with grpc.insecure_channel(ip + ':' + port) as channel:
-                stub = chaosmonkey_pb2_grpc.ChaosMonkeyStub(channel)
-                response = stub.GetMatrix(chaosmonkey_pb2.Empty())
-                matrix = list()
-                for row in response.rows:
-                    to_row = list()
-                    for e in row.vals:
-                        to_row.append(e)
-                    matrix.append(to_row)
-                return 0, matrix
-        except Exception as e:
-            return 1, list()
+        for ip, port in self.configs['nodes']:
+            try:
+                with grpc.insecure_channel(ip + ':' + port) as channel:
+                    stub = chaosmonkey_pb2_grpc.ChaosMonkeyStub(channel)
+                    response = stub.GetMatrix(chaosmonkey_pb2.Empty())
+                    matrix = list()
+                    for row in response.rows:
+                        to_row = list()
+                        for e in row.vals:
+                            to_row.append(e)
+                        matrix.append(to_row)
+                    return 0, matrix
+            except Exception as e:
+                return 1, list()
 
     def kill_a_node(self, node_id):
         # return if_succeed
