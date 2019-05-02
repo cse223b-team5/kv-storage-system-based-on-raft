@@ -512,17 +512,14 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         self.convert_to_follower(request.term)
         return storage_service_pb2.AppendEntriesResponse(term=self.currentTerm, success=True)
 
+    #@synchronized(lock_persistent_operations)
     @network
     def RequestVote(self, request, context):
         if request is None:
             return storage_service_pb2.RequestVoteResponse(voteGranted=False)
 
-        # TODO: need to modify RequestVote() according to Ling's exposed_request_vote()
-
-    #@synchronized(lock_persistent_operations)
-    def RequestVote(self, request, context):
-        # 1
         with self.lock_persistent_operations:
+            # 1
             if request.term < self.currentTerm:
                 return storage_service_pb2.RequestVoteResponse(term=self.currentTerm, voteGranted=False)
 
@@ -577,7 +574,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
     def convert_to_follower(self, term, is_persist=True):
         # do we need to reset the voteFor value? YES
         self.state = 0
-        self.term = term
+        self.currentTerm = term
         self.voteCnt = 0
 
         if is_persist:
