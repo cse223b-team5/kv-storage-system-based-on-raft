@@ -14,13 +14,13 @@ class ChaosMonkey():
         self.configs = load_config(config_path)
 
     def _upload_to_server(self, configs, matrix):
-        print('start uploading conn_matrix to other nodes')
+        # print('start uploading conn_matrix to other nodes')
         for ip, port in configs['nodes']:
-            print('Addr to connect: ' + ip + ":" + port)
+            # print('Addr to connect: ' + ip + ":" + port)
             with grpc.insecure_channel(ip + ':' + port) as channel:
                 stub = chaosmonkey_pb2_grpc.ChaosMonkeyStub(channel)
                 response = stub.UploadMatrix(matrix)
-                print('Response from port' + str(port) + ":" + str(response.ret))
+                # print('Response from port' + str(port) + ":" + str(response.ret))
 
     def uploadMatrix(self, matrix_path):
         matrix_list = load_matrix(matrix_path)
@@ -33,11 +33,11 @@ class ChaosMonkey():
 
     def editMatrix(self, row, col, val):
         for ip, port in self.configs['nodes']:
-            print('Addr to connect: ' + ip + ":" + port)
+            # print('Addr to connect: ' + ip + ":" + port)
             with grpc.insecure_channel(ip + ':' + port) as channel:
                 stub = chaosmonkey_pb2_grpc.ChaosMonkeyStub(channel)
                 response = stub.UpdateValue(chaosmonkey_pb2.MatValue(row=int(row), col=int(col), val=float(val)))
-                print('Response from port' + str(port) + ":" + str(response.ret))
+                # print('Response from port' + str(port) + ":" + str(response.ret))
 
     def get_current_connMatrix(self):
         # return if_succeed, matrix
@@ -70,7 +70,7 @@ class ChaosMonkey():
     def kill_a_node_randomly(self):
         # return if_succeed, node_killed
         #   if_succeed: 0 for succeeded, 1 for failed
-        node_id = random.choice(len(self.configs['nodes']))
+        node_id = random.choice(range(len(self.configs['nodes'])))
         ret = self.kill_a_node(node_id)
         if ret == 0:
             return 0, node_id

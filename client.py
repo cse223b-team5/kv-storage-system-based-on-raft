@@ -6,7 +6,7 @@ import storage_service_pb2
 import storage_service_pb2_grpc
 from utils import load_config
 
-PRINT_RESULT = True
+PRINT_RESULT = False
 
 
 class Client:
@@ -47,11 +47,11 @@ class Client:
             stub = storage_service_pb2_grpc.KeyValueStoreStub(channel)
             try:
                 response = stub.Put(storage_service_pb2.PutRequest(
-                    key=key, value=value, serial_no=str(random.randint(0,10000))))
+                    key=key, value=value, serial_no=str(random.randint(0, 10000))))
                 if response.ret == 0:
                     return 0, (0, 0)  # if_succeed, (ip, port)
                 elif response.ret == 1 and response.leader_ip != '' and response.leader_port != '':
-                    return 1, (response.ip, response.port)
+                    return 1, (response.leader_ip, response.leader_port)
                 else:
                     return 2, (0, 0)
             except Exception as e:
@@ -104,7 +104,6 @@ class Client:
         key = str(key)
         for _ in range(3):
             once_ret = self.get_once(key)
-            print(once_ret)
             if once_ret[0] == 0:
                 if PRINT_RESULT:
                     print(once_ret[1])
