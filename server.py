@@ -4,19 +4,20 @@ import sys
 import os
 import logging
 import threading
+import random
 import functools
 import grpc
 import storage_service_pb2
 import storage_service_pb2_grpc
 import chaosmonkey_pb2
 import chaosmonkey_pb2_grpc
-from utils import load_config
-from chaos_server import ChaosServer
+from utils import load_config, load_matrix
 from logging import Logger, StreamHandler, Formatter
 
 # The memory operations on voteFor, log[]/log_term[], and state, and their persistency is protected by a single lock
 
-PERSISTENT_PATH_PREFIC = "/tmp/223b_raft_"
+conn_mat = None
+PERSISTENT_PATH_PREFIX = "/tmp/223b_raft_"
 
 
 def synchronized(lock):
@@ -28,6 +29,22 @@ def synchronized(lock):
                 return f(*args, **kw)
         return new_function
     return wrap
+
+
+# Note: This function is not used for RPC calls by ChaosMonkey client. It is only used among storage servers/clients.
+def network(func):
+    def wrapper_network(obj, request, context):
+        src = obj.get_node_id_by_ipv6(context.peer())
+        dest = obj.node_index
+
+        threshold = float(conn_mat[src][dest])
+        if random.random() < threshold:
+            # drop this message
+            time.sleep(1.5)
+            return func(obj, None, context)
+        else:
+            return func(obj, request, context)
+    return wrapper_network
 
 
 _ONE_DAY_IN_SECONDS = 60 * 60 * 24
@@ -101,7 +118,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
             self.evoke_apply_thread()
 
     def get_persist_path(self):
-        return "{}_{}_persistent.txt".format(PERSISTENT_PATH_PREFIC, self.node_index)
+        return "{}_{}_persistent.txt".format(PERSISTENT_PATH_PREFIX, self.node_index)
 
     def set_heartbeat_timer(self):
         self.heartbeat_once_to_all()
@@ -210,6 +227,15 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         port = self.configs['nodes'][self.leaderIndex][1]
         return ip, port
 
+    def get_node_id_by_ipv6(self, ip):
+        target_port = ip.split(':')[-1]
+        index = 0
+        for ip, port in self.configs['nodes']:
+            if port == target_port:
+                break
+            index += 1
+        return index
+
     def DEBUG_GetVariable(self, request, context):
         response = storage_service_pb2.DEBUG_GetVariable_Response()
 
@@ -226,7 +252,11 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
 
         return response
 
+    @network
     def Get(self, request, context):
+        if request is None:
+            return storage_service_pb2.GetResponse(ret=1)
+
         if not self.check_is_leader():
             ip, port = self.get_leader_ip_port()
             return storage_service_pb2.GetResponse(leader_ip=ip, leader_port=port, ret=1)
@@ -345,7 +375,11 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
                     args=(ip_port_tuple[0], ip_port_tuple[1], node_index, ae_succeed_cnt, lock_ae_succeed_cnt))
                 ae_thread.start()
 
+    @network
     def Put(self, request, context):
+        if request is None:
+            return storage_service_pb2.PutResponse(ret=1)
+
         #  check if current node is leader. if not, help client redirect
         if not self.check_is_leader():
             ip = self.configs['nodes'][self.leaderIndex][0]
@@ -430,8 +464,11 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
             self.apply_thread = threading.Thread(target=self.apply, args=())
         self.apply_thread.start()
 
-    #@synchronized(lock_persistent_operations)
+    @network
     def AppendEntries(self, request, context):
+        if request is None:
+            return storage_service_pb2.AppendEntriesResponse(success=False)
+
         self.logger.info('{} received AppendEntries call from node (term:{}, leaderId:{})'.format(
             self.node_index, request.term, request.leaderId))
         
@@ -464,13 +501,18 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         self.commitIndex = max(self.commitIndex, min(request.leaderCommit, len(self.log) - 1))
 
         # TODO: step down to follower
-
         self.convert_to_follower(request.term)
         return storage_service_pb2.AppendEntriesResponse(term=self.currentTerm, success=True)
 
-    # @synchronized(lock_persistent_operations)
+    @network
     def RequestVote(self, request, context):
+        if request is None:
+            return storage_service_pb2.RequestVoteResponse(voteGranted=False)
+
         # TODO: need to modify RequestVote() according to Ling's exposed_request_vote()
+
+    #@synchronized(lock_persistent_operations)
+    def RequestVote(self, request, context):
         # 1
         with self.lock_persistent_operations:
             if request.term < self.currentTerm:
@@ -523,7 +565,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         s.append("log: {}".format(str(self.log)))
         return "\n".join(s)
 
-    @synchronized(lock_persistent_operations)
+    #@synchronized(lock_persistent_operations)
     def convert_to_follower(self, term, is_persist=True):
         # do we need to reset the voteFor value? YES
         self.state = 0
@@ -536,12 +578,15 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         # if the previous state is leader, then set the timer
         if self.heartbeat_timer:
             self.heartbeat_timer.cancel()
-
         self.evoke_apply_thread()
 
-    @synchronized(lock_persistent_operations)
+    #@synchronized(lock_persistent_operations)
     def convert_to_candidate(self):
         # TODO: increment term by 1, set voteCnt and state to 1, set voteFor to self.node_index
+        self.state = 1
+        self.voteFor = self.node_index
+        self.term += 1
+        self.voteCnt = 1
 
         self.persist()
         self.logger.info('{} converts to candidate in term {}'.format(self.node_index, self.currentTerm))
@@ -553,8 +598,10 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         # TODO: add cancel_election_timer() function
         self.cancel_election_timer()
         # TODO: set state to 2
+        self.state = 2
         self.persist()
         # TODO: is run_heartbeat_timer() same as set_heart_beat() which is not defined
+        self.run_heartbeat_timer()
         self.set_heartbeat_timer()
 
     def ask_for_vote_to_all(self):
@@ -571,10 +618,9 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
 
     def ask_for_vote_to_one(self, ip, port, node_index):
         self.logger.info('{} ask vote from {} in term {}'.format(self.node_index, node_index, self.currentTerm))
-        # TODO: consider whether we need to consider the current state, 如果此时不是candidate，不requestVote
         with grpc.insecure_channel(ip + ':' + port) as channel:
             stub = storage_service_pb2_grpc.KeyValueStoreStub(channel)
-            request = self.generate_RequestVote_request()
+            request = self.generate_requestVote_request()
             try:
                 response = stub.RequestVote(request, timeout=float(self.configs['rpc_timeout']))
             except Exception:
@@ -590,12 +636,13 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
                     with self.lock_persistent_operations:
                         self.voteCnt += 1
                         self.persist()
+
                     self.logger.info("get one vote from node {}, current voteCnt is {}".format(node_index, self.voteCnt))
                     majority_cnt = len(self.configs['nodes']) // 2 + 1
                     if self.state != 2 and self.voteCnt >= majority_cnt:
                         self.convert_to_leader()
 
-    def generate_RequestVote_request(self):
+    def generate_requestVote_request(self):
         request = storage_service_pb2.RequestVoteRequest()
         request.term = self.currentTerm
         request.candidateId = self.node_index
@@ -609,19 +656,38 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
 
 
 class ChaosServer(chaosmonkey_pb2_grpc.ChaosMonkeyServicer):
+    def __init__(self):
+        global conn_mat
+        conn_mat = load_matrix('matrix')
+
     def UploadMatrix(self, request, context):
         global conn_mat
-        conn_mat = request
-        print('New ConnMat uploaded')
+
+        mat = list()
+        for row in request.rows:
+            to_row = list()
+            for e in row.vals:
+                to_row.append(e)
+            mat.append(to_row)
+
+        conn_mat = mat
         return chaosmonkey_pb2.Status(ret=0)
 
     def UpdateValue(self, request, context):
         global conn_mat
-        if request.row >= len(conn_mat.rows) or request.col >= len(conn_mat.rows[request.row].vals):
+        if request.row >= len(conn_mat) or request.col >= len(conn_mat):
             return chaosmonkey_pb2.Status(ret=1)
-        conn_mat.rows[request.row].vals[request.col] = request.val
-        print('New edit to ConnMat')
+        conn_mat[request.row][request.col] = request.val
         return chaosmonkey_pb2.Status(ret=0)
+
+    def GetMatrix(self, request, context):
+        global conn_mat
+        to_mat = chaosmonkey_pb2.ConnMatrix()
+        for from_row in conn_mat:
+            to_row = to_mat.rows.add()
+            for element in from_row:
+                to_row.vals.append(element)
+        return to_mat
 
 
 def serve(config_path, myIp, myPort):
