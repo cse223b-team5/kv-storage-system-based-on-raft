@@ -2,8 +2,6 @@
 
 ips="ec2-34-218-222-160.us-west-2.compute.amazonaws.com ec2-34-217-105-63.us-west-2.compute.amazonaws.com ec2-34-217-113-33.us-west-2.compute.amazonaws.com ec2-34-216-220-150.us-west-2.compute.amazonaws.com ec2-54-202-138-67.us-west-2.compute.amazonaws.com ec2-54-185-243-252.us-west-2.compute.amazonaws.com ec2-34-222-62-168.us-west-2.compute.amazonaws.com ec2-54-190-60-161.us-west-2.compute.amazonaws.com"
 
-echo "hello"
-
 start_one_server(){
 	ip=$1
 	echo "-----------------------------------------------------"
@@ -11,7 +9,6 @@ start_one_server(){
 	echo "-----------------------------------------------------"
 	expect -c "
 		set timeout 20
-		puts \"in expect!!!!!!!!!!!!\"
 
 		spawn ssh -i cse223b-19sp-j4lu.pem ec2-user@$ip
 
@@ -45,8 +42,6 @@ start_one_server(){
 		expect eof
 	"
 }
-
-echo "hi"
 
 for ip in $ips; do
 	start_one_server $ip
