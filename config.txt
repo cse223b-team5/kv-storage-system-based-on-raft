@@ -4,4 +4,4 @@ port_start: 5001
 heartbeat_timeout: 0.5
 election_timeout_start: 3
 election_timeout_end: 5
-rpc_timeout: 1
+rpc_timeout: 0.5

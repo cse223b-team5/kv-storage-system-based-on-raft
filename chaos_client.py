@@ -63,8 +63,9 @@ class ChaosMonkey():
         if node_id < 0 or node_id >= len(self.configs['nodes']):
             print('Invalid node_id.')
             return 1
-        for row_id in range(len(self.configs['nodes'])):
-            self.editMatrix(row_id, node_id, 1.0)
+        for id in range(len(self.configs['nodes'])):
+            self.editMatrix(id, node_id, 1.0)
+            self.editMatrix(node_id, id, 1.0)
         return 0
 
     def kill_a_node_randomly(self):
@@ -83,8 +84,9 @@ class ChaosMonkey():
         if node_id < 0 or node_id >= len(self.configs['nodes']):
             print('Invalid node_id.')
             return 1
-        for row_id in range(len(self.configs['nodes'])):
-            self.editMatrix(row_id, node_id, 0.0)
+        for id in range(len(self.configs['nodes'])):
+            self.editMatrix(id, node_id, 0.0)
+            self.editMatrix(node_id, id, 0.0)
         return 0
 
 
