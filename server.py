@@ -14,6 +14,9 @@ import chaosmonkey_pb2_grpc
 from utils import load_config, load_matrix
 from logging import Logger, StreamHandler, Formatter
 
+
+PRINT_RESULT = False
+
 # The memory operations on votedFor, log[]/log_term[], and state, and their persistency is protected by a single lock
 
 conn_mat = None
@@ -114,6 +117,8 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
                 self.currentTerm = int(history['term'])
             if 'log' in history:
                 self.log = history['log']
+            if 'logTerm' in history:
+                self.log_term = history['logTerm']
 
         log_size = len(self.log)
         for i in range(len(self.configs['nodes'])):
@@ -205,7 +210,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
     #@synchronized(lock_update_vote_cnt)
     def decrement_nextIndex(self, node_index):
         with self.lock_update_vote_cnt:
-            self.next_index[node_index] -= 1
+            self.nextIndex[node_index] -= 1
 
     #@synchronized(lock_try_extend_nextIndex)
     def try_extend_nextIndex(self, node_index, new_nextIndex):
@@ -381,7 +386,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
             else:
                 # AppendEntries failed because of log inconsistency
                 self.decrement_nextIndex(receiver_index)
-                self.replicate_log_entries_to_one(ip, port, receiver_index)
+                self.replicate_log_entries_to_one(ip, port, receiver_index, ae_succeed_cnt, lock_ae_succeed_cnt)
 
     def replicate_log_entries_to_all(self, ae_succeed_cnt):
         lock_ae_succeed_cnt = threading.Lock()
@@ -400,15 +405,13 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         if not self.check_is_leader():
             ip = self.configs['nodes'][self.leaderIndex][0]
             port = self.configs['nodes'][self.leaderIndex][1]
-            return storage_service_pb2.PutResponse(leader_ip=ip, leader_port=port)
+            return storage_service_pb2.PutResponse(ret=1, leader_ip=ip, leader_port=port)
 
         # to guarantee the 'at-most-once' rule; check commit history
         client_id = str(context.peer())
         if client_id in self.last_commit_history:
             if request.serial_no == self.last_commit_history[client_id][0] and self.last_commit_history[client_id][1]:
                 return storage_service_pb2.PutResponse(ret=0)
-
-        print('----------------------------------------------------------------------')
 
         self.append_to_local_log(request.key, request.value)
 
@@ -427,7 +430,6 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
             return storage_service_pb2.PutResponse(ret=1)
 
         # update commitIndex
-        print('majority_cnt: {}'.format(majority_cnt))
         self.update_commit_index()
 
         # apply to state machine
@@ -436,21 +438,21 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         # record in history
         self.last_commit_history[client_id] = (request.serial_no, True)
 
-        print('Leader matchIndex: ' + str(self.matchIndex))
-        print('Leader nextIndex: ' + str(self.nextIndex))
-        print(str(self.__dict__))
-        print('----------------------------------------------------------------------')
+        if PRINT_RESULT:
+            print('----------------------------------------------------------------------')
+            for key in self.__dict__:
+                print(key, self.__dict__[key])
+            print('----------------------------------------------------------------------')
+
         # respond to client
         return storage_service_pb2.PutResponse(ret=0)
 
     def update_commit_index(self):
         tmp_matchIndex = sorted(self.matchIndex)
         n = len(tmp_matchIndex)
-        print('matchIndex:' + str(self.matchIndex))
         new_commitIndex = tmp_matchIndex[(n-1)//2]
         # i is the max number to have appeared for more than majority_cnt times
         if self.check_is_leader():
-            print('Leader wants to update commitIndex to {}.'.format(new_commitIndex))
             self.try_extend_commitIndex(new_commitIndex)
 
     def set_log(self):
@@ -553,7 +555,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
             self.votedFor = request.candidateId
             self.convert_to_follower(request.term, request.candidateId, False)
             self.persist()
-            print('node#{}, term:{}, votedfor:{}'.format(self.node_index, self.currentTerm, self.votedFor))
+            print('Node #{}, term:{}, votedfor:{}'.format(self.node_index, self.currentTerm, self.votedFor))
             return storage_service_pb2.RequestVoteResponse(term=self.currentTerm, voteGranted=True)
 
     def persist(self):
@@ -642,7 +644,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
             stub = storage_service_pb2_grpc.KeyValueStoreStub(channel)
             request = self.generate_requestVote_request()
             try:
-                print('{} ask for vote {}'.format(self.node_index, node_index))
+                print('Node #{} asks for the vote by {}'.format(self.node_index, node_index))
                 response = stub.RequestVote(request, timeout=float(self.configs['rpc_timeout']))
             except Exception:
                 self.logger.error("Timeout error when requestVote to {}".format(node_index))
