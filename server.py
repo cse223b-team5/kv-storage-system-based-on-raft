@@ -579,7 +579,9 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         persistent_path = self.get_persist_path()
         if os.path.isfile(persistent_path):
             with open(persistent_path) as f:
-                history = eval(f.read())
+                print(f.read().strip() != "")
+                if f.read().strip() != "":
+                    history = eval(f.read().strip())
         return history
 
     def to_string(self):
