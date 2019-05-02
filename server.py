@@ -166,7 +166,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         if term:
             self.log_term.append(term)
         else:
-            self.log_term.appned(self.currentTerm)
+            self.log_term.append(self.currentTerm)
         self.persist()
         # print('(port:{})Local log: {}'.format(self.myPort, str(self.log)))
 
@@ -578,7 +578,9 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         persistent_path = self.get_persist_path()
         if os.path.isfile(persistent_path):
             with open(persistent_path) as f:
-                history = eval(f.read())
+                print(f.read().strip() != "")
+                if f.read().strip() != "":
+                    history = eval(f.read().strip())
         return history
 
     def to_string(self):
