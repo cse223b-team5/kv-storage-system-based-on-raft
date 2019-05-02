@@ -83,7 +83,3 @@ message DEBUG_GetVariable_Response {
 message Empty {
 
 }
-
-message Leader {
-    int32 leaderId = 1;
-}
