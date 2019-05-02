@@ -6,7 +6,7 @@ import storage_service_pb2
 import storage_service_pb2_grpc
 from utils import load_config
 
-PRINT_RESULT = False
+PRINT_RESULT = True
 
 
 class Client:
