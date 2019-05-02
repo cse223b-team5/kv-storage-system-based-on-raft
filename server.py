@@ -34,11 +34,10 @@ def synchronized(lock):
 # Note: This function is not used for RPC calls by ChaosMonkey client. It is only used among storage servers/clients.
 def network(func):
     def wrapper_network(obj, request, context):
-        src = obj.get_node_id_by_ipv6(context.peer())
+        src = obj.get_node_id_by_peer_addr(context.peer())
         dest = obj.node_index
 
-        threshold = float(conn_mat[src][dest])
-        if random.random() < threshold:
+        if random.random() < float(conn_mat[src][dest]) or src == -1:  # src == -1: from client
             # drop this message
             time.sleep(1.5)
             return func(obj, None, context)
@@ -55,7 +54,8 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         self.configs = load_config(config_path)
         self.myIp = myIp
         self.myPort = myPort
-        self.state = 0 # 0: follower, 1: candidate 2: leader
+        self.peers = dict()  # {[::1]:50000 -> 1, ..]
+        self.state = 0  # 0: follower, 1: candidate 2: leader
         self.voteFor = None
         self.currentTerm = 0
         self.node_index = self.get_node_index_by_addr(myIp, myPort)
@@ -137,6 +137,10 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         if self.election_timer:
             self.election_timer.cancel()
         self.set_election_timer()
+
+    def get_random_timeout(self):
+        return random.randint(int(self.configs['election_timeout_start']) * 1000,
+                              int(self.configs['election_timeout_end']) * 1000) * 1.0 / 1000
 
     def append_to_local_log(self, key, value):
         self.log.append((key, value))
@@ -227,14 +231,10 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         port = self.configs['nodes'][self.leaderIndex][1]
         return ip, port
 
-    def get_node_id_by_ipv6(self, ip):
-        target_port = ip.split(':')[-1]
-        index = 0
-        for ip, port in self.configs['nodes']:
-            if port == target_port:
-                break
-            index += 1
-        return index
+    def get_node_id_by_peer_addr(self, addr):
+        if addr not in self.peers:
+            return -1
+        return self.peers[addr]
 
     def DEBUG_GetVariable(self, request, context):
         response = storage_service_pb2.DEBUG_GetVariable_Response()
@@ -335,6 +335,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
                 entry.key = str(e[0])
                 entry.value = str(e[1])
 
+        request.senderIndex = self.node_index
         return request, new_nextIndex
 
     def update_nextIndex_and_matchIndex(self, node_index, new_nextIndex):
@@ -458,16 +459,23 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
                 self.write_to_state(self.lastApplied)
                 self.lastApplied += 1
             time.sleep(0.02)
+        self.apply_thread = None
 
     def evoke_apply_thread(self):
         if not self.apply_thread:
             self.apply_thread = threading.Thread(target=self.apply, args=())
-        self.apply_thread.start()
+            self.apply_thread.start()
 
     @network
     def AppendEntries(self, request, context):
+        # @network will pass a None request to simulate network connection failure
         if request is None:
             return storage_service_pb2.AppendEntriesResponse(success=False)
+
+        # get the mapping from context.peer() to node_index in our self.configs['nodes']
+        if len(self.peers) != len(self.configs['nodes']):
+            if context.peer() not in self.peers:
+                self.peers[context.peer()] = request.senderIndex
 
         self.logger.info('{} received AppendEntries call from node (term:{}, leaderId:{})'.format(
             self.node_index, request.term, request.leaderId))
@@ -585,7 +593,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         # TODO: increment term by 1, set voteCnt and state to 1, set voteFor to self.node_index
         self.state = 1
         self.voteFor = self.node_index
-        self.term += 1
+        self.currentTerm += 1
         self.voteCnt = 1
 
         self.persist()
@@ -607,7 +615,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
     def ask_for_vote_to_all(self):
         # send RPC requests to all other nodes
         for t in self.configs['nodes']:
-            if t[0] == self.ip and t[1] == self.port:
+            if t[0] == self.myIp and t[1] == self.myPort:
                 continue
             try:
                 node_index = self.get_node_index_by_addr(t[0], t[1])
@@ -631,7 +639,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
             elif request.term > self.currentTerm:
                 self.convert_to_follower(request.term)
             else:
-                if request.voteGranted:
+                if response.voteGranted:
                     # TODO: increment voteCnt by 1
                     with self.lock_persistent_operations:
                         self.voteCnt += 1
