@@ -578,8 +578,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
             else:
                 if request.voteGranted:
                     # TODO: increment voteCnt by 1
-                    #with self._lock:
-                    self.cnt += 1
+                    self.voteCnt += 1
                     self.persist()
                     self.logger.info("get one vote from node {}, current voteCnt is {}".format(node_index, self.voteCnt))
                     majority_cnt = len(self.configs['nodes']) // 2 + 1
