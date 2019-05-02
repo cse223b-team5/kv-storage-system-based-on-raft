@@ -515,6 +515,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
             i = len(self.log) - 1
             while i > request.prevLogIndex:
                 self.log.pop(i)
+                self.log_term.pop(i)
                 i -= 1
 
             # 4
@@ -577,9 +578,10 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         persistent_path = self.get_persist_path()
         if os.path.isfile(persistent_path):
             with open(persistent_path) as f:
-                print(f.read().strip() != "")
-                if f.read().strip() != "":
-                    history = eval(f.read().strip())
+                # print(f.read().strip() != "")
+                s = f.read().rstrip()
+                if s != "":
+                    history = eval(s)
         return history
 
     def to_string(self):
