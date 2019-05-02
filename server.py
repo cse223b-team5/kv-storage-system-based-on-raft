@@ -271,7 +271,6 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
 
         return response
 
-    @network
     def Get(self, request, context):
         # return if_succeed
         #   0 for succeeded, tailed with value
@@ -316,7 +315,6 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
                 self.logger.error('Node #{} When heartbeat to node{}, inconsistency detected.'.
                                   format(self.node_index, node_index))
                 self.decrement_nextIndex(node_index)
-                print(self.nextIndex[node_index])
                 self.heartbeat_once_to_one(ip, port, node_index)
 
     def heartbeat_once_to_all(self, is_sync_entry=True):
@@ -343,7 +341,9 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         request.prevLogIndex = entry_start_index - 1
 
         # print('log_term and preLogIndex: {},{}'.format(self.log_term, request.prevLogIndex))
-        
+
+        # print('len(self.log): {}, receiver with node_index: {}, nextIndex[node_index]: {}, request.prevLogIndex: {}.'.
+        #       format(len(self.log), node_index, self.nextIndex[node_index], request.prevLogIndex))
         if request.prevLogIndex < 0:
             request.prevLogTerm = 0
         else:
@@ -355,10 +355,12 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         new_nextIndex = len(self.log)
         if entry_start_index < len(self.log):
             es = self.log[entry_start_index:new_nextIndex]
-            for e in es:
+            terms = self.log_term[entry_start_index:new_nextIndex]
+            for i in range(len(es)):
                 entry = request.entries.add()
-                entry.key = str(e[0])
-                entry.value = str(e[1])
+                entry.key = str(es[i][0])
+                entry.value = str(es[i][1])
+                entry.term = int(terms[i])
 
         request.senderIndex = self.node_index
         return request, new_nextIndex
@@ -400,7 +402,6 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
                     args=(ip_port_tuple[0], ip_port_tuple[1], node_index, ae_succeed_cnt, lock_ae_succeed_cnt))
                 ae_thread.start()
 
-    @network
     def Put(self, request, context):
         if request is None:
             return storage_service_pb2.PutResponse(ret=1)
@@ -469,6 +470,8 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         return logger
 
     def write_to_state(self, log_index):
+        # print('Node: #{}, log len: {}, log_index: {}, commitIndex: {}'.
+        #       format(self.node_index, len(self.log), log_index, self.commitIndex))
         k, v = self.log[log_index]
         self.storage[k] = v
 
@@ -511,17 +514,18 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
                 return storage_service_pb2.AppendEntriesResponse(
                     term=self.currentTerm, success=False, failed_for_term=False)  # inconsistency
 
-            # if candidate or leader then step down to follower
             i = len(self.log) - 1
             while i > request.prevLogIndex:
+                # print('Node #{} pop log, its commitIndex is {}'.format(self.node_index, self.commitIndex))
                 self.log.pop(i)
+                self.log_term.pop(i)
                 i -= 1
 
             # 4
             self.currentTerm = request.term
 
             for entry in request.entries:
-                self.append_to_local_log(entry.key, entry.value, request.term)
+                self.append_to_local_log(entry.key, entry.value, entry.term)
 
             # 5 when there is partial partition and two leader has different commitIndex so use the outside "max"
             self.commitIndex = max(self.commitIndex, min(request.leaderCommit, len(self.log) - 1))
@@ -577,9 +581,10 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         persistent_path = self.get_persist_path()
         if os.path.isfile(persistent_path):
             with open(persistent_path) as f:
-                print(f.read().strip() != "")
-                if f.read().strip() != "":
-                    history = eval(f.read().strip())
+                # print(f.read().strip() != "")
+                s = f.read().rstrip()
+                if s != "":
+                    history = eval(s)
         return history
 
     def to_string(self):
@@ -678,7 +683,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         if request.lastLogIndex < 0:
             request.lastLogTerm = 0
         else:
-            request.lastLogTerm = self.log_term[-1]
+            request.lastLogTerm = int(self.log_term[-1])
         return request
 
 
