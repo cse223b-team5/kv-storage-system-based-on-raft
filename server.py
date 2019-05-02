@@ -14,13 +14,6 @@ import chaosmonkey_pb2_grpc
 from utils import load_config, load_matrix
 from logging import Logger, StreamHandler, Formatter
 
-lock_persistent_operations = threading.Lock()
-lock_decrement_nextIndex = threading.Lock()
-lock_try_extend_nextIndex = threading.Lock()
-lock_try_extend_matchIndex = threading.Lock()
-lock_state_machine = threading.Lock()
-lock_try_extend_commitIndex = threading.Lock()
-lock_update_vote_cnt = threading.Lock()
 # The memory operations on voteFor, log[]/log_term[], and state, and their persistency is protected by a single lock
 
 conn_mat = None
@@ -89,6 +82,15 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
 
         self.start()
 
+    def init_locks(self):
+        self.lock_persistent_operations = threading.Lock()
+        self.lock_decrement_nextIndex = threading.Lock()
+        self.lock_try_extend_nextIndex = threading.Lock()
+        self.lock_try_extend_matchIndex = threading.Lock()
+        self.lock_state_machine = threading.Lock()
+        self.lock_try_extend_commitIndex = threading.Lock()
+        self.lock_update_vote_cnt = threading.Lock()
+
     def init_states(self):
         history = self.load_history()
         if not history:
@@ -107,12 +109,13 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
 
     def start(self):
         self.init_states()
+        self.init_locks()
         if self.is_leader:
             self.logger.info('This node is leader.')
             self.set_heartbeat_timer()
         else:
             self.set_election_timer()
-            self.revoke_apply_thread()
+            self.evoke_apply_thread()
 
     def get_persist_path(self):
         return "{}_{}_persistent.txt".format(PERSISTENT_PATH_PREFIX, self.node_index)
@@ -152,52 +155,61 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
 
         self.persist()
 
-    @synchronized(lock_persistent_operations)
+    #@synchronized(self.lock_persistent_operations)
     def update_voteFor(self, new_voteFor):
-        if not self.voteFor:
-            self.voteFor = new_voteFor
+        with self.lock_persistent_operations:
+            if not self.voteFor:
+                self.voteFor = new_voteFor
+                self.persist()
+
+    #@synchronized(self.lock_persistent_operations)
+    def update_state(self, new_state):
+        with self.lock_persistent_operations:
+            self.state = new_state
             self.persist()
 
-    @synchronized(lock_persistent_operations)
-    def update_state(self, new_state):
-        self.state = new_state
-        self.persist()
-
-    @synchronized(lock_persistent_operations)
+    #@synchronized(lock_persistent_operations)
     def update_term(self, currentTerm):
-        self.currentTerm = currentTerm
-        self.persist()
+        with self.lock_persistent_operations:
+            self.currentTerm = currentTerm
+            self.persist()
 
-    @synchronized(lock_update_vote_cnt)
+    #@synchronized(lock_update_vote_cnt)
     def update_vote_cnt(self, reset=False):
-        if reset:
-            self.voteCnt = 0
-        else:
-            self.voteCnt += 1
+        with self.lock_update_vote_cnt:
+            if reset:
+                self.voteCnt = 0
+            else:
+                self.voteCnt += 1
 
-    @synchronized(lock_decrement_nextIndex)
+    #@synchronized(lock_update_vote_cnt)
     def decrement_nextIndex(self, node_index):
-        self.next_index[node_index] -= 1
+        with self.lock_update_vote_cnt:
+            self.next_index[node_index] -= 1
 
-    @synchronized(lock_try_extend_nextIndex)
+    #@synchronized(lock_try_extend_nextIndex)
     def try_extend_nextIndex(self, node_index, new_nextIndex):
-        if new_nextIndex > self.nextIndex[node_index]:
-            self.nextIndex[node_index] = new_nextIndex
+        with self.lock_try_extend_nextIndex:
+            if new_nextIndex > self.nextIndex[node_index]:
+                self.nextIndex[node_index] = new_nextIndex
 
-    @synchronized(lock_try_extend_matchIndex)
+    #@synchronized(lock_try_extend_matchIndex)
     def try_extend_matchIndex(self, node_index, new_matchIndex):
-        if new_matchIndex > self.matchIndex[node_index]:
-            self.matchIndex[node_index] = new_matchIndex
+        with self.lock_try_extend_matchIndex:
+            if new_matchIndex > self.matchIndex[node_index]:
+                self.matchIndex[node_index] = new_matchIndex
 
-    @synchronized(lock_try_extend_commitIndex)
+    #@synchronized(lock_try_extend_commitIndex)
     def try_extend_commitIndex(self, new_commitIndex):
-        if new_commitIndex > self.commitIndex:
-            self.commitIndex = new_commitIndex
+        with self.lock_try_extend_commitIndex:
+            if new_commitIndex > self.commitIndex:
+                self.commitIndex = new_commitIndex
 
-    @synchronized(lock_state_machine)
+    #@synchronized(lock_state_machine)
     def modify_state_machine(self, key, value):
-        self.storage[key] = value
-        self.lastApplied = self.commitIndex
+        with self.lock_state_machine:
+            self.storage[key] = value
+            self.lastApplied = self.commitIndex
 
     def check_is_leader(self):
         return self.node_index == self.leaderIndex
@@ -447,7 +459,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
                 self.lastApplied += 1
             time.sleep(0.02)
 
-    def revoke_apply_thread(self):
+    def evoke_apply_thread(self):
         if not self.apply_thread:
             self.apply_thread = threading.Thread(target=self.apply, args=())
         self.apply_thread.start()
@@ -481,15 +493,15 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
 
         # 4
         self.currentTerm = request.term
+
         for entry in request.entries:
-            self.append_to_local_log(entry.key, entry.value)
+            self.append_to_local_log(entry.key, entry.value, request.term)
 
         # 5
-        self.commitIndex = min(request.leaderCommit, len(self.log) - 1)
+        self.commitIndex = max(self.commitIndex, min(request.leaderCommit, len(self.log) - 1))
 
         # TODO: step down to follower
-        if self.state != 0:
-            self.convert_to_follower(request.term)
+        self.convert_to_follower(request.term)
         return storage_service_pb2.AppendEntriesResponse(term=self.currentTerm, success=True)
 
     @network
@@ -499,29 +511,27 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
 
         # TODO: need to modify RequestVote() according to Ling's exposed_request_vote()
 
-    @synchronized(lock_persistent_operations)
+    #@synchronized(lock_persistent_operations)
     def RequestVote(self, request, context):
         # 1
-        if request.term < self.currentTerm:
-            return storage_service_pb2.RequestVoteResponse(term=self.currentTerm, voteGranted=False)
+        with self.lock_persistent_operations:
+            if request.term < self.currentTerm:
+                return storage_service_pb2.RequestVoteResponse(term=self.currentTerm, voteGranted=False)
 
-        # 2 has vote for others
-        if request.term == self.currentTerm and self.voteFor:
-            return storage_service_pb2.RequestVoteResponse(term=self.currentTerm, voteGranted=False)
+            # 2 has vote for others
+            if request.term == self.currentTerm and self.voteFor and self.voteFor != request.candidateId:
+                return storage_service_pb2.RequestVoteResponse(term=self.currentTerm, voteGranted=False)
 
-        # 3
-        #server的最新term是比较log_term的最后一个entry还是currentTerm；request.term = self.log_term[len(self.log)-1]的情况
-        if not (request.lastLogIndex > len(self.log) - 1 and request.term >= self.log_term[len(self.log)-1] \
-            or request.lastLogIndex <= len(self.log) - 1 and request.term > self.log_term[request.lastLogIndex]):
-            return storage_service_pb2.RequestVoteResponse(term=self.currentTerm, voteGranted=False)
+            # 3 server的最新term是比较log_term的最后一个entry还是currentTerm；request.term = self.log_term[len(self.log)-1]的情况
+            if len(self.log_term) > 0 and (request.lastLogTerm < self.log_term[-1] or \
+                    (request.lastLogTerm == self.log_term[-1] and request.lastLogIndex < len(self.log) - 1)):
+                return storage_service_pb2.RequestVoteResponse(term=self.currentTerm, voteGranted=False)
 
-        # 4 convert to follower
-        if request.term > self.currentTerm and self.state != 0:
+            # 4 convert to follower
+            self.votedFor = request.candidateId
             self.convert_to_follower(request.term, False)
-
-        self.voteFor = request.candidateId
-        self.persist()
-        return storage_service_pb2.RequestVoteResponse(term=self.currentTerm, voteGranted=True)
+            self.persist()
+            return storage_service_pb2.RequestVoteResponse(term=self.currentTerm, voteGranted=True)
 
     def persist(self):
         history = dict()
@@ -555,22 +565,22 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         s.append("log: {}".format(str(self.log)))
         return "\n".join(s)
 
-    @synchronized(lock_persistent_operations)
+    #@synchronized(lock_persistent_operations)
     def convert_to_follower(self, term, is_persist=True):
         # do we need to reset the voteFor value? YES
         self.state = 0
-        self.voteFor = None
         self.term = term
-        self.cnt = 0
+        self.voteCnt = 0
 
         if is_persist:
-            self.persist(self.to_string())
+            self.persist()
         self.reset_election_timer()
         # if the previous state is leader, then set the timer
         if self.heartbeat_timer:
             self.heartbeat_timer.cancel()
+        self.evoke_apply_thread()
 
-    @synchronized(lock_persistent_operations)
+    #@synchronized(lock_persistent_operations)
     def convert_to_candidate(self):
         # TODO: increment term by 1, set voteCnt and state to 1, set voteFor to self.node_index
         self.state = 1
@@ -623,9 +633,10 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
             else:
                 if request.voteGranted:
                     # TODO: increment voteCnt by 1
-                    #with self._lock:
-                    self.cnt += 1
-                    self.persist()
+                    with self.lock_persistent_operations:
+                        self.voteCnt += 1
+                        self.persist()
+
                     self.logger.info("get one vote from node {}, current voteCnt is {}".format(node_index, self.voteCnt))
                     majority_cnt = len(self.configs['nodes']) // 2 + 1
                     if self.state != 2 and self.voteCnt >= majority_cnt:
