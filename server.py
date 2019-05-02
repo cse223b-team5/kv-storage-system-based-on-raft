@@ -576,7 +576,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
     def convert_to_follower(self, term, is_persist=True):
         # do we need to reset the voteFor value? YES
         self.state = 0
-        self.term = term
+        self.currentTerm = term
         self.voteCnt = 0
 
         if is_persist:
