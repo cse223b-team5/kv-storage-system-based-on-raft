@@ -565,7 +565,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         self.logger.info('{} ask vote from {} in term {}'.format(self.node_index, node_index, self.currentTerm))
         with grpc.insecure_channel(ip + ':' + port) as channel:
             stub = storage_service_pb2_grpc.KeyValueStoreStub(channel)
-            request = self.generate_RequestVote_request()
+            request = self.generate_requestVote_request()
             try:
                 response = stub.RequestVote(request, timeout=float(self.configs['rpc_timeout']))
             except Exception:
@@ -586,7 +586,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
                     if self.state != 2 and self.voteCnt >= majority_cnt:
                         self.convert_to_leader()
 
-    def generate_RequestVote_request(self):
+    def generate_requestVote_request(self):
         request = storage_service_pb2.RequestVoteRequest()
         request.term = self.currentTerm
         request.candidateId = self.node_index
