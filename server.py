@@ -458,11 +458,12 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
                 self.write_to_state(self.lastApplied)
                 self.lastApplied += 1
             time.sleep(0.02)
+        self.apply_thread = None
 
     def evoke_apply_thread(self):
         if not self.apply_thread:
             self.apply_thread = threading.Thread(target=self.apply, args=())
-        self.apply_thread.start()
+            self.apply_thread.start()
 
     @network
     def AppendEntries(self, request, context):
