@@ -355,10 +355,12 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         new_nextIndex = len(self.log)
         if entry_start_index < len(self.log):
             es = self.log[entry_start_index:new_nextIndex]
-            for e in es:
+            es_terms = self.log[entry_start_index:new_nextIndex]
+            for i, e in enumerate(es):
                 entry = request.entries.add()
                 entry.key = str(e[0])
                 entry.value = str(e[1])
+                entry.term = str(es_terms[i])
 
         request.senderIndex = self.node_index
         return request, new_nextIndex
@@ -515,13 +517,14 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
             i = len(self.log) - 1
             while i > request.prevLogIndex:
                 self.log.pop(i)
+                self.log_term.pop(i)
                 i -= 1
 
             # 4
             self.currentTerm = request.term
 
             for entry in request.entries:
-                self.append_to_local_log(entry.key, entry.value, request.term)
+                self.append_to_local_log(entry.key, entry.value, entry.term)
 
             # 5 when there is partial partition and two leader has different commitIndex so use the outside "max"
             self.commitIndex = max(self.commitIndex, min(request.leaderCommit, len(self.log) - 1))
@@ -577,9 +580,9 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         persistent_path = self.get_persist_path()
         if os.path.isfile(persistent_path):
             with open(persistent_path) as f:
-                print(f.read().strip() != "")
-                if f.read().strip() != "":
-                    history = eval(f.read().strip())
+                s = f.read().rstrip()
+                if s != "":
+                    history = eval(s)
         return history
 
     def to_string(self):
