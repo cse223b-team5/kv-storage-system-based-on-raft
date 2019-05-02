@@ -271,7 +271,6 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
 
         return response
 
-    @network
     def Get(self, request, context):
         # return if_succeed
         #   0 for succeeded, tailed with value
@@ -284,14 +283,25 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
             ip, port = self.get_leader_ip_port()
             return storage_service_pb2.GetResponse(leader_ip=ip, leader_port=port, ret=1)
         # no need to sync entries, ensure own leadership
-        self.heartbeat_once_to_all(False)
+
+        hb_success_error_cnt = list()
+        hb_success_error_cnt.add(0)
+        hb_success_error_cnt.add(0)
+        self.heartbeat_once_to_all(hb_success_error_cnt, False)
+
+        majority_cnt = len(self.configs['nodes']) // 2 + 1
+        while hb_success_error_cnt[0] < majority_cnt and hb_success_error_cnt[1] == 0:
+            if not self.check_is_leader():
+                break
+            continue
+
         # this is a synchronous function call, return when heartbeats to all nodes have returned
         if self.check_is_leader() and request.key in self.storage:
             return storage_service_pb2.GetResponse(value=str(self.storage[request.key]), ret=0)
         else:
             return storage_service_pb2.GetResponse(ret=2)
 
-    def heartbeat_once_to_one(self, ip, port, node_index, is_sync_entry=True):
+    def heartbeat_once_to_one(self, ip, port, node_index, hb_success_error_cnt, hb_success_error_lock, is_sync_entry=True):
         self.logger.info("sending heartbeat to node_{}_{}_{}".format(node_index, ip, port))
         with grpc.insecure_channel(ip + ':' + port) as channel:
             stub = storage_service_pb2_grpc.KeyValueStoreStub(channel)
@@ -305,8 +315,12 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
             if response.success:
                 self.update_nextIndex_and_matchIndex(node_index, new_nextIndex)
                 self.logger.info('Heartbeat to {} succeeded.'.format(node_index))
+                with hb_success_error_lock:
+                    hb_success_error_cnt[0] += 1
             elif response.failed_for_term:
                 # voter's term is larger than the leader, so leader changes to follower
+                with hb_success_error_lock:
+                    hb_success_error_lock[1] += 1
                 self.convert_to_follower(response.term, node_index)
             else:
                 # AppendEntries failed because of log inconsistency
@@ -316,23 +330,19 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
                 self.logger.error('Node #{} When heartbeat to node{}, inconsistency detected.'.
                                   format(self.node_index, node_index))
                 self.decrement_nextIndex(node_index)
-                print(self.nextIndex[node_index])
                 self.heartbeat_once_to_one(ip, port, node_index)
 
-    def heartbeat_once_to_all(self, is_sync_entry=True):
+    def heartbeat_once_to_all(self, hb_success_error_cnt, is_sync_entry=True):
         self.logger.info('Start sending heartbeat_once_to_all.')
-        threads = []
+        hb_success_error_lock = threading.Lock()
         for node_index, ip_port_tuple in enumerate(self.configs['nodes']):
             ip = ip_port_tuple[0]
             port = ip_port_tuple[1]
             if ip == self.myIp and port == self.myPort:
                 continue
-            ae_thread = threading.Thread(target=self.heartbeat_once_to_one, args=(ip, port, node_index, is_sync_entry))
-            threads.append(ae_thread)
+            ae_thread = threading.Thread(target=self.heartbeat_once_to_one, args=(ip, port, node_index, hb_success_error_cnt,
+                                                                                  hb_success_error_lock, is_sync_entry))
             ae_thread.start()
-
-        for t in threads:
-            t.join()
 
     def generate_append_entry_request(self, node_index):
         request = storage_service_pb2.AppendEntriesRequest()
@@ -343,7 +353,9 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         request.prevLogIndex = entry_start_index - 1
 
         # print('log_term and preLogIndex: {},{}'.format(self.log_term, request.prevLogIndex))
-        
+
+        # print('len(self.log): {}, receiver with node_index: {}, nextIndex[node_index]: {}, request.prevLogIndex: {}.'.
+        #       format(len(self.log), node_index, self.nextIndex[node_index], request.prevLogIndex))
         if request.prevLogIndex < 0:
             request.prevLogTerm = 0
         else:
@@ -355,13 +367,12 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         new_nextIndex = len(self.log)
         if entry_start_index < len(self.log):
             es = self.log[entry_start_index:new_nextIndex]
-            es_terms = self.log[entry_start_index:new_nextIndex]
-            for i, e in enumerate(es):
+            terms = self.log_term[entry_start_index:new_nextIndex]
+            for i in range(len(es)):
                 entry = request.entries.add()
-                entry.key = str(e[0])
-                entry.value = str(e[1])
-                entry.term = str(es_terms[i])
-
+                entry.key = str(es[i][0])
+                entry.value = str(es[i][1])
+                entry.term = int(terms[i])
         request.senderIndex = self.node_index
         return request, new_nextIndex
 
@@ -402,7 +413,6 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
                     args=(ip_port_tuple[0], ip_port_tuple[1], node_index, ae_succeed_cnt, lock_ae_succeed_cnt))
                 ae_thread.start()
 
-    @network
     def Put(self, request, context):
         if request is None:
             return storage_service_pb2.PutResponse(ret=1)
@@ -471,6 +481,8 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         return logger
 
     def write_to_state(self, log_index):
+        # print('Node: #{}, log len: {}, log_index: {}, commitIndex: {}'.
+        #       format(self.node_index, len(self.log), log_index, self.commitIndex))
         k, v = self.log[log_index]
         self.storage[k] = v
 
@@ -513,9 +525,9 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
                 return storage_service_pb2.AppendEntriesResponse(
                     term=self.currentTerm, success=False, failed_for_term=False)  # inconsistency
 
-            # if candidate or leader then step down to follower
             i = len(self.log) - 1
             while i > request.prevLogIndex:
+                # print('Node #{} pop log, its commitIndex is {}'.format(self.node_index, self.commitIndex))
                 self.log.pop(i)
                 self.log_term.pop(i)
                 i -= 1
@@ -580,6 +592,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         persistent_path = self.get_persist_path()
         if os.path.isfile(persistent_path):
             with open(persistent_path) as f:
+                # print(f.read().strip() != "")
                 s = f.read().rstrip()
                 if s != "":
                     history = eval(s)
@@ -681,7 +694,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         if request.lastLogIndex < 0:
             request.lastLogTerm = 0
         else:
-            request.lastLogTerm = self.log_term[-1]
+            request.lastLogTerm = int(self.log_term[-1])
         return request
 
 

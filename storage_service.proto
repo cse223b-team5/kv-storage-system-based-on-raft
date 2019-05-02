@@ -42,7 +42,7 @@ message AppendEntriesRequest {
     message Entry {
         string key = 1;
         string value = 2;
-        string term = 3;
+        int32 term = 3;
     }
     repeated Entry entries = 5;
 
