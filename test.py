@@ -127,6 +127,7 @@ def static_test():
         ret = client.put(key, value)
         keys.append(key)
         put_stats.update(ret)
+        # time.sleep(0.1)
     end = time.time()
 
     put_stats.duration = end - start
@@ -141,6 +142,7 @@ def static_test():
         key = get_a_random_key()
         ret = client.get(key)
         get_stats.update(ret, key)
+        time.sleep(0.01)
     end = time.time()
 
     get_stats.duration = end - start
