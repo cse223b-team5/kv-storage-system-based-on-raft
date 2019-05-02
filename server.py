@@ -20,7 +20,8 @@ PRINT_RESULT = False
 # The memory operations on votedFor, log[]/log_term[], and state, and their persistency is protected by a single lock
 
 conn_mat = None
-PERSISTENT_PATH_PREFIX = "/tmp/223b_raft_"
+# PERSISTENT_PATH_PREFIX = "/tmp/223b_raft_"
+PERSISTENT_PATH_PREFIX  = "tmp_raft_"
 
 
 def synchronized(lock):
@@ -289,7 +290,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         else:
             return storage_service_pb2.GetResponse(ret=1)
 
-    def heartbeat_once_to_one(self, ip, port, node_index, is_sync_entry):
+    def heartbeat_once_to_one(self, ip, port, node_index, is_sync_entry=True):
         self.logger.info("sending heartbeat to node_{}_{}_{}".format(node_index, ip, port))
         with grpc.insecure_channel(ip + ':' + port) as channel:
             stub = storage_service_pb2_grpc.KeyValueStoreStub(channel)
@@ -485,7 +486,6 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
             self.apply_thread.start()
 
     @network
-    @synchronized
     def AppendEntries(self, request, context):
         # get the mapping from context.peer() to node_index in our self.configs['nodes']
         if len(self.peers) != len(self.configs['nodes']):
@@ -646,23 +646,24 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
             try:
                 print('Node #{} asks for the vote by {}'.format(self.node_index, node_index))
                 response = stub.RequestVote(request, timeout=float(self.configs['rpc_timeout']))
-            except Exception:
+                # when the response packets delay and detour in the network so than this response is an stale
+                if response.term < self.currentTerm:
+                    return
+                elif response.term > self.currentTerm:
+                    self.convert_to_follower(request.term, node_index)
+                else:
+                    if response.voteGranted:
+                        with self.lock_persistent_operations:
+                            self.voteCnt += 1
+
+                            self.logger.info(
+                                "get one vote from node {}, current voteCnt is {}".format(node_index, self.voteCnt))
+                            majority_cnt = len(self.configs['nodes']) // 2 + 1
+                            if self.state != 2 and self.voteCnt >= majority_cnt:
+                                self.convert_to_leader()
+
+            except Exception as e:
                 self.logger.error("Timeout error when requestVote to {}".format(node_index))
-
-            # when the response packets delay and detour in the network so than this response is an stale
-            if response.term < self.currentTerm:
-                return
-            elif response.term > self.currentTerm:
-                self.convert_to_follower(request.term, node_index)
-            else:
-                if response.voteGranted:
-                    with self.lock_persistent_operations:
-                        self.voteCnt += 1
-
-                        self.logger.info("get one vote from node {}, current voteCnt is {}".format(node_index, self.voteCnt))
-                        majority_cnt = len(self.configs['nodes']) // 2 + 1
-                        if self.state != 2 and self.voteCnt >= majority_cnt:
-                            self.convert_to_leader()
 
     def generate_requestVote_request(self):
         request = storage_service_pb2.RequestVoteRequest()
