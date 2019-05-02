@@ -9,7 +9,7 @@ NO_of_GETS = 1000
 SIMULATION_DURATION = 100  # in seconds
 
 client = Client('config.txt')
-chaosmonkey = ChaosMonkey()
+chaosmonkey = ChaosMonkey('config.txt')
 
 configs = load_config('config.txt')
 nodes = configs['nodes']

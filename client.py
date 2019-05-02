@@ -6,7 +6,7 @@ import storage_service_pb2
 import storage_service_pb2_grpc
 from utils import load_config
 
-PRINT_RESULT = False
+PRINT_RESULT = True
 
 
 class Client:
@@ -28,8 +28,8 @@ class Client:
                 if response.ret == 0:
                     return 0, response.value, (0, 0)
                 elif response.ret == 1:
-                    if response.ip is not None and response.port is not None:
-                        return 1, 0, (response.ip, response.port)
+                    if response.leader_ip != '' and response.leader_port != '':
+                        return 1, 0, (response.leader_ip, response.leader_port)
                     else:
                         return 2, 0, (0, 0)
                 else:
@@ -50,7 +50,7 @@ class Client:
                     key=key, value=value, serial_no=str(random.randint(0,10000))))
                 if response.ret == 0:
                     return 0, (0, 0)  # if_succeed, (ip, port)
-                elif response.ret == 1 and response.ip is not None and response.port is not None:
+                elif response.ret == 1 and response.leader_ip != '' and response.leader_port != '':
                     return 1, (response.ip, response.port)
                 else:
                     return 2, (0, 0)
@@ -104,6 +104,7 @@ class Client:
         key = str(key)
         for _ in range(3):
             once_ret = self.get_once(key)
+            print(once_ret)
             if once_ret[0] == 0:
                 if PRINT_RESULT:
                     print(once_ret[1])
@@ -124,6 +125,7 @@ class Client:
                 if PRINT_RESULT:
                     print('Connection failed!')
                 return 3, 0
+        print('Failed after many attempts!')
         return 4, 0
 
     def get_leader(self):
