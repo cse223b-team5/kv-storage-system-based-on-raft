@@ -6,7 +6,7 @@ import time
 
 NO_of_PUTS = 100
 NO_of_GETS = 1000
-SIMULATION_DURATION = 60  # in seconds
+SIMULATION_DURATION = 100  # in seconds
 
 client = Client('config.txt')
 chaosmonkey = ChaosMonkey()
@@ -154,7 +154,7 @@ print('---------------------------------------------------------------------')
 clear_put_stats()
 clear_get_stats()
 
-print('60sec test with dynamic network condition. Nodes might die and revive.')
+print('{}sec test with dynamic network condition. Nodes might die and revive.'.format(SIMULATION_DURATION))
 
 start = time.time()
 node_killed = -1
@@ -174,10 +174,14 @@ while time.time() - start < SIMULATION_DURATION:
         ret = client.get(key)
         update_get_stats(ret)
         no_of_get += 1
-
+    print('---------------------------------------------------------------------')
     print('{} PUT and {} GET are performed, total elapsed time: {}ms'.format(no_of_put, no_of_get, int(duration*1000)))
     report_put_stats(duration*0.5, no_of_put)
     report_get_stats(duration*0.5, no_of_get)
+    leader_index, leader_ip, leader_port = client.get_leader()
+    print('Present leader is node #{} at {}:{}'.format(leader_index, leader_ip, leader_port))
+    clear_put_stats()
+    clear_get_stats()
 
     if node_killed == -1:
         # no node is killed, so now kill one
