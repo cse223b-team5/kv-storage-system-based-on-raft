@@ -30,8 +30,8 @@ class Client:
                 elif response.ret == 1:
                     if response.leader_ip != '' and response.leader_port != '':
                         return 1, 0, (response.leader_ip, response.leader_port)
-                    else:
-                        return 2, 0, (0, 0)
+                elif response.ret == 2:
+                    return 2, 0, (0, 0)
                 else:
                     return 3, 0, (0, 0)
             except Exception as e:
