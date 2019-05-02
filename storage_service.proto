@@ -10,12 +10,6 @@ service KeyValueStore {
     rpc DEBUG_GetVariable(DEBUG_GetVariable_Resquest) returns (DEBUG_GetVariable_Response) {}
 }
 
-// You'll likely need to define more specific return codes than these!
-enum ReturnCode {
-    SUCCESS = 0;
-    FAILURE = 1;
-}
-
 message GetRequest {
     string key = 1;
 }
@@ -24,7 +18,7 @@ message GetResponse {
     string value = 1;
     string leader_ip = 2;
     string leader_port = 3;
-    ReturnCode ret = 4;
+    int32 ret = 4;
 }
 
 message PutRequest {
@@ -34,7 +28,7 @@ message PutRequest {
 }
 
 message PutResponse {
-    ReturnCode ret = 1;
+    int32 ret = 1;
     string leader_ip = 2;
     string leader_port = 3;
 }

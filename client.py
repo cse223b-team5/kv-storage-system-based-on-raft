@@ -28,8 +28,8 @@ class Client:
                 if response.ret == 0:
                     return 0, response.value, (0, 0)
                 elif response.ret == 1:
-                    if response.ip is not None and response.port is not None:
-                        return 1, 0, (response.ip, response.port)
+                    if response.leader_ip != '' and response.leader_port != '':
+                        return 1, 0, (response.leader_ip, response.leader_port)
                     else:
                         return 2, 0, (0, 0)
                 else:
@@ -47,11 +47,11 @@ class Client:
             stub = storage_service_pb2_grpc.KeyValueStoreStub(channel)
             try:
                 response = stub.Put(storage_service_pb2.PutRequest(
-                    key=key, value=value, serial_no=str(random.randint(0,10000))))
+                    key=key, value=value, serial_no=str(random.randint(0, 10000))))
                 if response.ret == 0:
                     return 0, (0, 0)  # if_succeed, (ip, port)
-                elif response.ret == 1 and response.ip is not None and response.port is not None:
-                    return 1, (response.ip, response.port)
+                elif response.ret == 1 and response.leader_ip != '' and response.leader_port != '':
+                    return 1, (response.leader_ip, response.leader_port)
                 else:
                     return 2, (0, 0)
             except Exception as e:
@@ -124,6 +124,7 @@ class Client:
                 if PRINT_RESULT:
                     print('Connection failed!')
                 return 3, 0
+        print('Failed after many attempts!')
         return 4, 0
 
     def get_leader(self):
