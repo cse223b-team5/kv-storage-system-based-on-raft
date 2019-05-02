@@ -282,7 +282,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         if not self.check_is_leader():
             ip, port = self.get_leader_ip_port()
             return storage_service_pb2.GetResponse(leader_ip=ip, leader_port=port, ret=1)
-        # no need to sync entries
+        # no need to sync entries, ensure own leadership
         self.heartbeat_once_to_all(False)
         # this is a synchronous function call, return when heartbeats to all nodes have returned
         if self.check_is_leader() and request.key in self.storage:
@@ -531,6 +531,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
             self.convert_to_follower(request.term, request.leaderId)
         return storage_service_pb2.AppendEntriesResponse(term=self.currentTerm, success=True)
 
+    #@synchronized(lock_persistent_operations)
     @network
     def RequestVote(self, request, context):
         if request is None:
