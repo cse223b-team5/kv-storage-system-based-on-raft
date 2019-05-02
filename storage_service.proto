@@ -52,6 +52,8 @@ message AppendEntriesRequest {
     repeated Entry entries = 5;
 
     int32 leaderCommit = 6;
+
+    int32 senderIndex = 7;
 }
 
 message AppendEntriesResponse {
