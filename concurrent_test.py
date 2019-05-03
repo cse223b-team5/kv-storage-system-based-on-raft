@@ -262,21 +262,3 @@ if __name__ == '__main__':
         start_dynamic_test()
     else:
         print("Invalid operation")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
