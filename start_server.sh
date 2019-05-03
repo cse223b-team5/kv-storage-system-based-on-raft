@@ -9,4 +9,3 @@ python server.py config.txt localhost 5007 &
 python server.py config.txt localhost 5008 &
 python server.py config.txt localhost 5009 &
 python server.py config.txt localhost 5010 &
-
