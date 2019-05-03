@@ -268,7 +268,8 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
             response.value = str(self.storage)
         elif request.variable == 'conn_mat':
             response.value = str(conn_mat)
-        elif request.variable == 'all':
+        elif request.variable == '' \
+                                 '':
             response.value = str(self.__dict__)
         else:
             response.value = 'Invaid variable.'
@@ -357,6 +358,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         request.term = self.currentTerm
         request.leaderId = self.node_index
 
+        #with self.lock_persistent_operations:
         entry_start_index = self.nextIndex[node_index]
         request.prevLogIndex = entry_start_index - 1
 
