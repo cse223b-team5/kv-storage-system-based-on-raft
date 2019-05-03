@@ -199,9 +199,9 @@ class ConcurrentTester:
             except Exception:
                 print("client error")
 
-        #for ct in cts:
-        #    ct.join()
-        #self.report()
+        for ct in cts:
+           ct.join()
+        self.report()
 
     def run_one_client(self, key_start, key_end):
         key_range = "{}_{}".format(key_start, key_end)
@@ -233,26 +233,28 @@ class ConcurrentTester:
 
 def start_static_test():
     # static concurrent put test
-    static_put_ct = ConcurrentTester(0, 0, 10, 5)
+    static_put_ct = ConcurrentTester(0, 0, NO_of_CONCURRENCY, 5)
     static_put_ct.test()
 
     # # static concurrent get test
-    static_get_ct = ConcurrentTester(0, 1, 10, 5)
+    static_get_ct = ConcurrentTester(0, 1, NO_of_CONCURRENCY, 5)
     static_get_ct.put_records_all = static_put_ct.put_records_all
     static_get_ct.test()
     #
-    # # static concurrent_put_get_orderly
-    # static_get_ct = ConcurrentTester(0, 2, 10, 20)
-    # static_get_ct.put_records_all = static_put_ct.put_records_all
-    # static_get_ct.test()
-    #
-    # # static concurrent_put_get_by_ratio
-    # static_get_ct = ConcurrentTester(0, 3, 10, 20)
-    # static_get_ct.put_records_all = static_put_ct.put_records_all
-    # static_get_ct.test()
+    # static concurrent_put_get_orderly
+    static_get_ct = ConcurrentTester(0, 2, NO_of_CONCURRENCY, 5)
+    static_get_ct.put_records_all = static_put_ct.put_records_all
+    static_get_ct.test()
+
+    # static concurrent_put_get_by_ratio
+    static_get_ct = ConcurrentTester(0, 3, NO_of_CONCURRENCY, 5)
+    static_get_ct.put_records_all = static_put_ct.put_records_all
+    static_get_ct.test()
+
 
 def start_dynamic_test():
     pass
+
 
 if __name__ == '__main__':
     test_type = sys.argv[1]
