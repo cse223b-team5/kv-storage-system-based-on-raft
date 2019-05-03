@@ -531,7 +531,8 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
             if request.term < self.currentTerm:
                 return storage_service_pb2.AppendEntriesResponse(
                     term=self.currentTerm, success=False, failed_for_term=True)
-
+            #if len(request.entries) == 0:
+            #    return  storage_service_pb2.AppendEntriesResponse(term=self.currentTerm, success=True)
             # 2 when request.prevLogIndex < 0, it should be regarded as log consistent
             # same index with the same term can make sure the log is the same one, so just compare index & term is enough
             if len(self.log) - 1 < request.prevLogIndex or \
@@ -558,7 +559,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
 
             self.leaderIndex = request.leaderId
             self.convert_to_follower(request.term, request.leaderId)
-        return storage_service_pb2.AppendEntriesResponse(term=self.currentTerm, success=True)
+            return storage_service_pb2.AppendEntriesResponse(term=self.currentTerm, success=True)
 
     #@synchronized(lock_persistent_operations)
     @network
