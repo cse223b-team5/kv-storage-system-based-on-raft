@@ -1,10 +1,7 @@
-N: 5
-node0: localhost:5001
-node1: localhost:5002
-node2: localhost:5003
-node3: localhost:5004
-node4: localhost:5005
+servers: ["localhost"]
+num_of_nodes_in_each_aws: 10
+port_start: 5001
 heartbeat_timeout: 0.5
-election_timeout_start: 3
-election_timeout_end: 5
-rpc_timeout: 1
+election_timeout_start: 2
+election_timeout_end: 3
+rpc_timeout: 0.5

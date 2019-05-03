@@ -5,8 +5,8 @@ import random
 import time
 
 NO_of_PUTS = 100
-NO_of_GETS = 1000  # in seconds
-LOOP_CNT = 6  # kill and revive nodes for LOOP_CNT times, should be even
+NO_of_GETS = 100  # in seconds
+LOOP_CNT = 4  # kill and revive nodes for LOOP_CNT times, should be even
 
 client = Client('config.txt')
 chaosmonkey = ChaosMonkey('config.txt')
@@ -127,6 +127,7 @@ def static_test():
         ret = client.put(key, value)
         keys.append(key)
         put_stats.update(ret)
+        # time.sleep(0.1)
     end = time.time()
 
     put_stats.duration = end - start
@@ -141,6 +142,7 @@ def static_test():
         key = get_a_random_key()
         ret = client.get(key)
         get_stats.update(ret, key)
+        # time.sleep(0.01)
     end = time.time()
 
     get_stats.duration = end - start
@@ -205,9 +207,11 @@ def dynamic_test():
                 node_killed = -1
             else:
                 print('Node {} cannot be revived.'.format(node_killed))
+
+        print('Sleep for 3 sec for new election.')
     print('---------------------------------------------------------------------')
 
 
 if __name__ == '__main__':
-    # static_test()
-    dynamic_test()
+    static_test()
+    # dynamic_test()

@@ -1,0 +1,10 @@
+node_index_0, localhost, 5001
+node_index_1, localhost, 5002
+node_index_2, localhost, 5003
+node_index_3, localhost, 5004
+node_index_4, localhost, 5005
+node_index_5, localhost, 5006
+node_index_6, localhost, 5007
+node_index_7, localhost, 5008
+node_index_8, localhost, 5009
+node_index_9, localhost, 5010

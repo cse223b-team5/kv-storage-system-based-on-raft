@@ -19,7 +19,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   package='kvstore',
   syntax='proto3',
   serialized_options=None,
-  serialized_pb=_b('\n\x15storage_service.proto\x12\x07kvstore\"\x19\n\nGetRequest\x12\x0b\n\x03key\x18\x01 \x01(\t\"Q\n\x0bGetResponse\x12\r\n\x05value\x18\x01 \x01(\t\x12\x11\n\tleader_ip\x18\x02 \x01(\t\x12\x13\n\x0bleader_port\x18\x03 \x01(\t\x12\x0b\n\x03ret\x18\x04 \x01(\x05\";\n\nPutRequest\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t\x12\x11\n\tserial_no\x18\x03 \x01(\t\"B\n\x0bPutResponse\x12\x0b\n\x03ret\x18\x01 \x01(\x05\x12\x11\n\tleader_ip\x18\x02 \x01(\t\x12\x13\n\x0bleader_port\x18\x03 \x01(\t\"\xe7\x01\n\x14\x41ppendEntriesRequest\x12\x0c\n\x04term\x18\x01 \x01(\x05\x12\x10\n\x08leaderId\x18\x02 \x01(\x05\x12\x14\n\x0cprevLogIndex\x18\x03 \x01(\x05\x12\x13\n\x0bprevLogTerm\x18\x04 \x01(\x05\x12\x34\n\x07\x65ntries\x18\x05 \x03(\x0b\x32#.kvstore.AppendEntriesRequest.Entry\x12\x14\n\x0cleaderCommit\x18\x06 \x01(\x05\x12\x13\n\x0bsenderIndex\x18\x07 \x01(\x05\x1a#\n\x05\x45ntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t\"O\n\x15\x41ppendEntriesResponse\x12\x0c\n\x04term\x18\x01 \x01(\x05\x12\x0f\n\x07success\x18\x02 \x01(\x08\x12\x17\n\x0f\x66\x61iled_for_term\x18\x03 \x01(\x08\"b\n\x12RequestVoteRequest\x12\x0c\n\x04term\x18\x01 \x01(\x05\x12\x13\n\x0b\x63\x61ndidateId\x18\x02 \x01(\x05\x12\x14\n\x0clastLogIndex\x18\x03 \x01(\x05\x12\x13\n\x0blastLogTerm\x18\x04 \x01(\x05\"8\n\x13RequestVoteResponse\x12\x0c\n\x04term\x18\x01 \x01(\x05\x12\x13\n\x0bvoteGranted\x18\x02 \x01(\x08\".\n\x1a\x44\x45\x42UG_GetVariable_Resquest\x12\x10\n\x08variable\x18\x01 \x01(\t\"+\n\x1a\x44\x45\x42UG_GetVariable_Response\x12\r\n\x05value\x18\x01 \x01(\t\"\x07\n\x05\x45mpty2\xf6\x02\n\rKeyValueStore\x12\x32\n\x03Get\x12\x13.kvstore.GetRequest\x1a\x14.kvstore.GetResponse\"\x00\x12\x32\n\x03Put\x12\x13.kvstore.PutRequest\x1a\x14.kvstore.PutResponse\"\x00\x12P\n\rAppendEntries\x12\x1d.kvstore.AppendEntriesRequest\x1a\x1e.kvstore.AppendEntriesResponse\"\x00\x12J\n\x0bRequestVote\x12\x1b.kvstore.RequestVoteRequest\x1a\x1c.kvstore.RequestVoteResponse\"\x00\x12_\n\x11\x44\x45\x42UG_GetVariable\x12#.kvstore.DEBUG_GetVariable_Resquest\x1a#.kvstore.DEBUG_GetVariable_Response\"\x00\x62\x06proto3')
+  serialized_pb=_b('\n\x15storage_service.proto\x12\x07kvstore\"\x19\n\nGetRequest\x12\x0b\n\x03key\x18\x01 \x01(\t\"Q\n\x0bGetResponse\x12\r\n\x05value\x18\x01 \x01(\t\x12\x11\n\tleader_ip\x18\x02 \x01(\t\x12\x13\n\x0bleader_port\x18\x03 \x01(\t\x12\x0b\n\x03ret\x18\x04 \x01(\x05\";\n\nPutRequest\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t\x12\x11\n\tserial_no\x18\x03 \x01(\t\"B\n\x0bPutResponse\x12\x0b\n\x03ret\x18\x01 \x01(\x05\x12\x11\n\tleader_ip\x18\x02 \x01(\t\x12\x13\n\x0bleader_port\x18\x03 \x01(\t\"\xf5\x01\n\x14\x41ppendEntriesRequest\x12\x0c\n\x04term\x18\x01 \x01(\x05\x12\x10\n\x08leaderId\x18\x02 \x01(\x05\x12\x14\n\x0cprevLogIndex\x18\x03 \x01(\x05\x12\x13\n\x0bprevLogTerm\x18\x04 \x01(\x05\x12\x34\n\x07\x65ntries\x18\x05 \x03(\x0b\x32#.kvstore.AppendEntriesRequest.Entry\x12\x14\n\x0cleaderCommit\x18\x06 \x01(\x05\x12\x13\n\x0bsenderIndex\x18\x07 \x01(\x05\x1a\x31\n\x05\x45ntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t\x12\x0c\n\x04term\x18\x03 \x01(\x05\"O\n\x15\x41ppendEntriesResponse\x12\x0c\n\x04term\x18\x01 \x01(\x05\x12\x0f\n\x07success\x18\x02 \x01(\x08\x12\x17\n\x0f\x66\x61iled_for_term\x18\x03 \x01(\x08\"b\n\x12RequestVoteRequest\x12\x0c\n\x04term\x18\x01 \x01(\x05\x12\x13\n\x0b\x63\x61ndidateId\x18\x02 \x01(\x05\x12\x14\n\x0clastLogIndex\x18\x03 \x01(\x05\x12\x13\n\x0blastLogTerm\x18\x04 \x01(\x05\"8\n\x13RequestVoteResponse\x12\x0c\n\x04term\x18\x01 \x01(\x05\x12\x13\n\x0bvoteGranted\x18\x02 \x01(\x08\".\n\x1a\x44\x45\x42UG_GetVariable_Resquest\x12\x10\n\x08variable\x18\x01 \x01(\t\"+\n\x1a\x44\x45\x42UG_GetVariable_Response\x12\r\n\x05value\x18\x01 \x01(\t\"\x07\n\x05\x45mpty2\xf6\x02\n\rKeyValueStore\x12\x32\n\x03Get\x12\x13.kvstore.GetRequest\x1a\x14.kvstore.GetResponse\"\x00\x12\x32\n\x03Put\x12\x13.kvstore.PutRequest\x1a\x14.kvstore.PutResponse\"\x00\x12P\n\rAppendEntries\x12\x1d.kvstore.AppendEntriesRequest\x1a\x1e.kvstore.AppendEntriesResponse\"\x00\x12J\n\x0bRequestVote\x12\x1b.kvstore.RequestVoteRequest\x1a\x1c.kvstore.RequestVoteResponse\"\x00\x12_\n\x11\x44\x45\x42UG_GetVariable\x12#.kvstore.DEBUG_GetVariable_Resquest\x1a#.kvstore.DEBUG_GetVariable_Response\"\x00\x62\x06proto3')
 )
 
 
@@ -219,6 +219,13 @@ _APPENDENTRIESREQUEST_ENTRY = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR),
+    _descriptor.FieldDescriptor(
+      name='term', full_name='kvstore.AppendEntriesRequest.Entry.term', index=2,
+      number=3, type=5, cpp_type=1, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR),
   ],
   extensions=[
   ],
@@ -232,7 +239,7 @@ _APPENDENTRIESREQUEST_ENTRY = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=470,
-  serialized_end=505,
+  serialized_end=519,
 )
 
 _APPENDENTRIESREQUEST = _descriptor.Descriptor(
@@ -304,7 +311,7 @@ _APPENDENTRIESREQUEST = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=274,
-  serialized_end=505,
+  serialized_end=519,
 )
 
 
@@ -348,8 +355,8 @@ _APPENDENTRIESRESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=507,
-  serialized_end=586,
+  serialized_start=521,
+  serialized_end=600,
 )
 
 
@@ -400,8 +407,8 @@ _REQUESTVOTEREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=588,
-  serialized_end=686,
+  serialized_start=602,
+  serialized_end=700,
 )
 
 
@@ -438,8 +445,8 @@ _REQUESTVOTERESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=688,
-  serialized_end=744,
+  serialized_start=702,
+  serialized_end=758,
 )
 
 
@@ -469,8 +476,8 @@ _DEBUG_GETVARIABLE_RESQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=746,
-  serialized_end=792,
+  serialized_start=760,
+  serialized_end=806,
 )
 
 
@@ -500,8 +507,8 @@ _DEBUG_GETVARIABLE_RESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=794,
-  serialized_end=837,
+  serialized_start=808,
+  serialized_end=851,
 )
 
 
@@ -524,8 +531,8 @@ _EMPTY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=839,
-  serialized_end=846,
+  serialized_start=853,
+  serialized_end=860,
 )
 
 _APPENDENTRIESREQUEST_ENTRY.containing_type = _APPENDENTRIESREQUEST
@@ -636,8 +643,8 @@ _KEYVALUESTORE = _descriptor.ServiceDescriptor(
   file=DESCRIPTOR,
   index=0,
   serialized_options=None,
-  serialized_start=849,
-  serialized_end=1223,
+  serialized_start=863,
+  serialized_end=1237,
   methods=[
   _descriptor.MethodDescriptor(
     name='Get',
