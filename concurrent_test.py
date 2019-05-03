@@ -187,7 +187,7 @@ class ConcurrentTester:
 
     def test(self):
         cts = []
-        N = 5
+        N = 30
         self.start_time = time.time()
         for i in range(self.clients_cnt):
             try:
