@@ -55,9 +55,11 @@ class NewGetStats:
         self.no_of_get += 1
         if ret[0] == 0:
             self.get_succeed_cnt += 1
-            if ret[1] == self.put_records[key]:
+            if key in self.put_records and ret[1] == self.put_records[key]: 
                 self.get_succeed_and_correct_cnt += 1
-        elif ret[0] == 1:
+        elif ret[0] == 1 and key not in self.put_records:
+            self.get_succeed_and_correct_cnt += 1
+        elif ret[0] == 1 and key in self.put_records:
             self.get_key_doesnt_exist_cnt += 1
         elif ret[0] == 2:
             self.get_unknown_error_cnt += 1
@@ -68,7 +70,7 @@ class NewGetStats:
 
 
 class Tester:
-    def __init__(self, test_type, concurrent_type, test_duration, key_start, key_end, get_ratio=0, put_records=None):
+    def __init__(self, test_type, concurrent_type, test_duration, key_start, key_end, get_ratio=0, put_records={}):
         self.test_type = test_type  # 0:static test, 1:dynamic test
         self.concurrent_type = concurrent_type
         self.get_ratio = get_ratio  # ratio of get request occurs; used for randomly put get test
@@ -116,20 +118,25 @@ class Tester:
             self.current_put_get_by_ratio()
 
     def run_concurrent_put(self):
-        # only run concurrent_put
+        # only run concurrent_put	
+        t1 = time.time()
         key, value = self.generate_kv()
         ret = self.client.put(key, value)
         self.put_stats.update(ret)
+        t2 = time.time()
         if ret == 0:
             self.put_records[key] = value
-        print("thread {} put key:{} value:{} ret:{}".format(self.key_start, key, value, ret))
+        print("thread {} put key:{} value:{} ret:{} time:{} ms".format(self.key_start, key, value, ret, 1000 * (t2-t1)))
 
     def concurrent_get(self):
         # only run concurrent_put
+        t1 = time.time()
         key = random.randint(self.key_start, self.key_end)
         ret = self.client.get(key)
-        self.get_stats.update(ret)
-
+        self.get_stats.update(ret, key)
+        t2 = time.time()
+        print("thread {} get key:{} ret:{} time:{} ms".format(self.key_start, key,  ret, 1000 * (t2-t1)))
+    
     def concurrent_put_get_orderly(self):
         # one get by one put
         key, value = self.generate_kv()
@@ -139,14 +146,14 @@ class Tester:
             self.put_records[key] = value
 
         ret = self.client.get(key)
-        self.get_stats.update(ret)
+        self.get_stats.update(ret, key)
 
     def current_put_get_by_ratio(self):
         if random.random() < self.get_ratio:
             # get request
             key = random.randint(self.key_start, self.key_end)
             ret = self.client.get(key)
-            self.get_stats.update(ret)
+            self.get_stats.update(ret, key)
         else:
             key, value = self.generate_kv()
             ret = self.client.put(key, value)
@@ -191,9 +198,9 @@ class ConcurrentTester:
             except Exception:
                 print("client error")
 
-        for ct in cts:
-            ct.join()
-        self.report()
+        #for ct in cts:
+        #    ct.join()
+        #self.report()
 
     def run_one_client(self, key_start, key_end):
         key_range = "{}_{}".format(key_start, key_end)
@@ -229,9 +236,9 @@ def start_test():
     static_put_ct.test()
 
     # # static concurrent get test
-    # static_get_ct = ConcurrentTester(0, 1, 10, 20)
-    # static_get_ct.put_records_all = static_put_ct.put_records_all
-    # static_get_ct.test()
+    static_get_ct = ConcurrentTester(0, 1, 10, 5)
+    static_get_ct.put_records_all = static_put_ct.put_records_all
+    static_get_ct.test()
     #
     # # static concurrent_put_get_orderly
     # static_get_ct = ConcurrentTester(0, 2, 10, 20)

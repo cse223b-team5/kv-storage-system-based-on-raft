@@ -741,7 +741,7 @@ class ChaosServer(chaosmonkey_pb2_grpc.ChaosMonkeyServicer):
 
 
 def serve(config_path, myIp, myPort):
-    server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
+    server = grpc.server(futures.ThreadPoolExecutor(max_workers=100))
     storage_service_pb2_grpc.add_KeyValueStoreServicer_to_server(StorageServer(config_path, myIp, myPort), server)
     chaosmonkey_pb2_grpc.add_ChaosMonkeyServicer_to_server(ChaosServer(), server)
 
