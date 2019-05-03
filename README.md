@@ -101,6 +101,10 @@ Examples:
 
 4. `python concurrent_test.py dynamic`
 
+To start the test, run test.py or concurrent_test.py and input parameters. To start a static test, input `static`; 
+to start a dynamic test, input `dynamic`. When the input pattern does not follow the above principles, it will 
+output "Invalid operation".
+
 
 
 
