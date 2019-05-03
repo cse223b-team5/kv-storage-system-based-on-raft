@@ -1,6 +1,7 @@
 import time
 import random
 import threading
+import sys
 from client import Client
 from utils import load_config
 from chaos_client import ChaosMonkey
@@ -230,7 +231,7 @@ class ConcurrentTester:
         print('---------------------------------------------------------------------\n')
 
 
-def start_test():
+def start_static_test():
     # static concurrent put test
     static_put_ct = ConcurrentTester(0, 0, 10, 5)
     static_put_ct.test()
@@ -245,14 +246,22 @@ def start_test():
     # static_get_ct.put_records_all = static_put_ct.put_records_all
     # static_get_ct.test()
     #
-    # # static current_put_get_by_ratio
+    # # static concurrent_put_get_by_ratio
     # static_get_ct = ConcurrentTester(0, 3, 10, 20)
     # static_get_ct.put_records_all = static_put_ct.put_records_all
     # static_get_ct.test()
 
+def start_dynamic_test():
+    pass
 
 if __name__ == '__main__':
-    start_test()
+    test_type = sys.argv[1]
+    if test_type == 'static':
+        start_static_test()
+    elif test_type == 'dynamic':
+        start_dynamic_test()
+    else:
+        print("Invalid operation")
 
 
 
