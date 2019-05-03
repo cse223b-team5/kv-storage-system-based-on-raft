@@ -46,10 +46,12 @@ def network(func):
 
         if random.random() < float(conn_mat[sender_index][obj.node_index]):
             # TODO: what about the connection between clients and servers?
-            # drop this message
+            # ignore this message
             time.sleep(1)
             return func(obj, None, context)
         else:
+            if random.random() < float(conn_mat[obj.node_index][sender_index]):
+                time.sleep(1)
             return func(obj, request, context)
     return wrapper_network
 
@@ -264,6 +266,8 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
             response.value = str(self.nextIndex)
         elif request.variable == 'log':
             response.value = str(self.storage)
+        elif request.variable == 'conn_mat':
+            response.value = str(conn_mat)
         elif request.variable == 'all':
             response.value = str(self.__dict__)
         else:
@@ -285,8 +289,8 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         # no need to sync entries, ensure own leadership
 
         hb_success_error_cnt = list()
-        hb_success_error_cnt.append(0)
-        hb_success_error_cnt.append(0)
+        hb_success_error_cnt.append(0) # heartbeat successfully
+        hb_success_error_cnt.append(0) # heartbeat unsuccessfully
 
         hb_success_error_lock = threading.Lock()
         self.heartbeat_once_to_all(hb_success_error_cnt, hb_success_error_lock, False)
@@ -675,7 +679,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
                 if not response.voteGranted:
                     return
                 # print(response.term)
-                if response.term < self.currentTerm:
+                if response.term < self.currentTerm:  # expired vote
                     return
                 elif response.term > self.currentTerm:
                     self.convert_to_follower(request.term, node_index)

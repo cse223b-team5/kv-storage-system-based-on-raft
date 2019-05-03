@@ -6,7 +6,7 @@ import storage_service_pb2
 import storage_service_pb2_grpc
 from utils import load_config
 
-PRINT_RESULT = False
+PRINT_RESULT = True
 
 
 class Client:
@@ -57,8 +57,11 @@ class Client:
             except Exception as e:
                 return -1, (0, 0)
 
-    def debug_get_variable(self, variable):
-        with grpc.insecure_channel(self.leader_ip + ':' + self.leader_port) as channel:
+    def debug_get_variable(self, variable, ip=None, port=None):
+        if not ip:
+            ip = self.leader_ip
+            port = self.leader_port
+        with grpc.insecure_channel(ip + ':' + port) as channel:
             stub = storage_service_pb2_grpc.KeyValueStoreStub(channel)
             try:
                 response = stub.DEBUG_GetVariable(storage_service_pb2.DEBUG_GetVariable_Resquest(variable=variable))
@@ -154,7 +157,13 @@ if __name__ == '__main__':
         value = sys.argv[4]
         client.put(key, value)
     elif operation == 'debug':
+        # python client.py config.txt debug all localhost 5001
         variable = sys.argv[3]
-        client.debug_get_variable(variable)
+        if len(sys.argv) >= 5:
+            ip = sys.argv[4]
+            port = sys.argv[5]
+            client.debug_get_variable(variable, ip, port)
+        else:
+            client.debug_get_variable(variable)
     else:
         print("Invalid operation")
