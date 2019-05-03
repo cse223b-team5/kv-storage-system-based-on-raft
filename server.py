@@ -285,8 +285,8 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         # no need to sync entries, ensure own leadership
 
         hb_success_error_cnt = list()
-        hb_success_error_cnt.append(0)
-        hb_success_error_cnt.append(0)
+        hb_success_error_cnt.append(0) # heartbeat successfully
+        hb_success_error_cnt.append(0) # heartbeat unsuccessfully
 
         hb_success_error_lock = threading.Lock()
         self.heartbeat_once_to_all(hb_success_error_cnt, hb_success_error_lock, False)
@@ -673,7 +673,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
                 if not response.voteGranted:
                     return
                 # print(response.term)
-                if response.term < self.currentTerm:
+                if response.term < self.currentTerm:  # expired vote
                     return
                 elif response.term > self.currentTerm:
                     self.convert_to_follower(request.term, node_index)
