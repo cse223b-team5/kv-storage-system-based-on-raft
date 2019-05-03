@@ -6,8 +6,8 @@ from client import Client
 from utils import load_config
 from chaos_client import ChaosMonkey
 
-NO_of_CONCURRENCY = 20
-TIME_of_TEST = 60  # s
+NO_of_CONCURRENCY = 5
+TIME_of_TEST = 5  # s
 CONCURRENT_TYPES = {0: "concurrent_put", 1:"concurrent_get",
                     2: "concurrent_put_get_orderly", 3: "current_put_get_by_ratio"}
 TEST_TYPES = {0: "static_test", 1: "dynamic_test"}
@@ -233,23 +233,23 @@ class ConcurrentTester:
 
 def start_static_test():
     # static concurrent put test
-    static_put_ct = ConcurrentTester(0, 0, 10, 5)
+    static_put_ct = ConcurrentTester(0, 0, NO_of_CONCURRENCY, TIME_of_TEST)
     static_put_ct.test()
 
     # # static concurrent get test
-    static_get_ct = ConcurrentTester(0, 1, 10, 5)
+    static_get_ct = ConcurrentTester(0, 1, NO_of_CONCURRENCY, TIME_of_TEST)
     static_get_ct.put_records_all = static_put_ct.put_records_all
     static_get_ct.test()
     #
-    # # static concurrent_put_get_orderly
-    # static_get_ct = ConcurrentTester(0, 2, 10, 20)
-    # static_get_ct.put_records_all = static_put_ct.put_records_all
-    # static_get_ct.test()
+    # static concurrent_put_get_orderly
+    static_get_ct = ConcurrentTester(0, 2, NO_of_CONCURRENCY, TIME_of_TEST)
+    static_get_ct.put_records_all = static_put_ct.put_records_all
+    static_get_ct.test()
     #
-    # # static concurrent_put_get_by_ratio
-    # static_get_ct = ConcurrentTester(0, 3, 10, 20)
-    # static_get_ct.put_records_all = static_put_ct.put_records_all
-    # static_get_ct.test()
+    # static concurrent_put_get_by_ratio
+    static_get_ct = ConcurrentTester(0, 3, NO_of_CONCURRENCY, TIME_of_TEST)
+    static_get_ct.put_records_all = static_put_ct.put_records_all
+    static_get_ct.test()
 
 def start_dynamic_test():
     pass
