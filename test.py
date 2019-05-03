@@ -213,5 +213,5 @@ def dynamic_test():
 
 
 if __name__ == '__main__':
-    static_test()
-    # dynamic_test()
+    #static_test()
+    dynamic_test()
