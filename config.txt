@@ -1,4 +1,4 @@
-servers: ["localhost"]
+servers: ["ec2-34-222-121-74.us-west-2.compute.amazonaws.com", "ec2-34-217-108-155.us-west-2.compute.amazonaws.com", "ec2-52-37-113-151.us-west-2.compute.amazonaws.com"]
 num_of_nodes_in_each_aws: 10
 port_start: 5001
 heartbeat_timeout: 0.5
