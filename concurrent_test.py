@@ -167,10 +167,6 @@ class Tester:
         value = random.randint(self.key_start, self.key_end)
         return key, value
 
-    def get_a_random_key(self):
-        key = random.choice(self.keys)
-        return key
-
 
 class ConcurrentTester:
     def __init__(self, test_type, concurrent_type, clients_cnt, test_duration):
@@ -199,9 +195,11 @@ class ConcurrentTester:
             except Exception:
                 print("client error")
 
-        #for ct in cts:
-        #    ct.join()
-        #self.report()
+        for ct in cts:
+           ct.join()
+        if self.total_cnt == 0:
+            self.total_cnt = 1
+        self.report()
 
     def run_one_client(self, key_start, key_end):
         key_range = "{}_{}".format(key_start, key_end)
@@ -242,14 +240,12 @@ def start_static_test():
     static_get_ct.test()
     #
     # static concurrent_put_get_orderly
-    static_get_ct = ConcurrentTester(0, 2, NO_of_CONCURRENCY, TIME_of_TEST)
-    static_get_ct.put_records_all = static_put_ct.put_records_all
-    static_get_ct.test()
+    static_put_get_ct = ConcurrentTester(0, 2, NO_of_CONCURRENCY, TIME_of_TEST)
+    static_put_get_ct.test()
     #
     # static concurrent_put_get_by_ratio
-    static_get_ct = ConcurrentTester(0, 3, NO_of_CONCURRENCY, TIME_of_TEST)
-    static_get_ct.put_records_all = static_put_ct.put_records_all
-    static_get_ct.test()
+    static_put_get_ratio_ct = ConcurrentTester(0, 3, NO_of_CONCURRENCY, TIME_of_TEST)
+    static_put_get_ratio_ct.test()
 
 def start_dynamic_test():
     pass
