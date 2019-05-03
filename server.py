@@ -276,6 +276,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         #   0 for succeeded, tailed with value
         #   1 for redirect, tailed with leader_ip and leader_port
         #   2 for key_not_found / none request
+        start = time.time()
         if request is None:
             return storage_service_pb2.GetResponse(ret=2)
 
@@ -286,8 +287,12 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         self.heartbeat_once_to_all(False)
         # this is a synchronous function call, return when heartbeats to all nodes have returned
         if self.check_is_leader() and request.key in self.storage:
+            end = time.time()
+            print('duration of Get() procession: {}'.format(str(end - start)))
             return storage_service_pb2.GetResponse(value=str(self.storage[request.key]), ret=0)
         else:
+            end = time.time()
+            print('duration of Get() procession: {}'.format(str(end - start)))
             return storage_service_pb2.GetResponse(ret=2)
 
     def heartbeat_once_to_one(self, ip, port, node_index, is_sync_entry=True):
@@ -340,13 +345,12 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         entry_start_index = self.nextIndex[node_index]
         request.prevLogIndex = entry_start_index - 1
 
-        # print('log_term and preLogIndex: {},{}'.format(self.log_term, request.prevLogIndex))
-
         # print('len(self.log): {}, receiver with node_index: {}, nextIndex[node_index]: {}, request.prevLogIndex: {}.'.
         #       format(len(self.log), node_index, self.nextIndex[node_index], request.prevLogIndex))
         if request.prevLogIndex < 0:
             request.prevLogTerm = 0
         else:
+            print('Node #{}: len(log_term) and preLogIndex: {}, {}'.format(self.node_index, len(self.log_term), request.prevLogIndex))
             request.prevLogTerm = self.log_term[request.prevLogIndex]
         request.leaderCommit = self.commitIndex
 
@@ -479,7 +483,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         while True:
             if self.check_is_leader():
                 break
-            if self.lastApplied <= self.commitIndex:
+            if self.lastApplied <= self.commitIndex and self.lastApplied < len(self.log):
                 self.write_to_state(self.lastApplied)
                 self.lastApplied += 1
             time.sleep(0.02)
@@ -656,6 +660,9 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
                 self.logger.info('Node #{} asks for the vote by {}'.format(self.node_index, node_index))
                 response = stub.RequestVote(request, timeout=float(self.configs['rpc_timeout']))
                 # when the response packets delay and detour in the network so than this response is an stale
+                if not response.voteGranted:
+                    return
+                # print(response.term)
                 if response.term < self.currentTerm:
                     return
                 elif response.term > self.currentTerm:
