@@ -283,14 +283,27 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
             ip, port = self.get_leader_ip_port()
             return storage_service_pb2.GetResponse(leader_ip=ip, leader_port=port, ret=1)
         # no need to sync entries, ensure own leadership
-        self.heartbeat_once_to_all(False)
+
+        hb_success_error_cnt = list()
+        hb_success_error_cnt.append(0)
+        hb_success_error_cnt.append(0)
+
+        hb_success_error_lock = threading.Lock()
+        self.heartbeat_once_to_all(hb_success_error_cnt, hb_success_error_lock, False)
+
+        majority_cnt = len(self.configs['nodes']) // 2 + 1
+        while hb_success_error_cnt[0] < majority_cnt and hb_success_error_cnt[1] == 0:
+            if not self.check_is_leader():
+                break
+            continue
+
         # this is a synchronous function call, return when heartbeats to all nodes have returned
         if self.check_is_leader() and request.key in self.storage:
             return storage_service_pb2.GetResponse(value=str(self.storage[request.key]), ret=0)
         else:
             return storage_service_pb2.GetResponse(ret=2)
 
-    def heartbeat_once_to_one(self, ip, port, node_index, is_sync_entry=True):
+    def heartbeat_once_to_one(self, ip, port, node_index, hb_success_error_cnt, hb_success_error_lock, is_sync_entry=True):
         self.logger.info("sending heartbeat to node_{}_{}_{}".format(node_index, ip, port))
         with grpc.insecure_channel(ip + ':' + port) as channel:
             stub = storage_service_pb2_grpc.KeyValueStoreStub(channel)
@@ -304,8 +317,14 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
             if response.success:
                 self.update_nextIndex_and_matchIndex(node_index, new_nextIndex)
                 self.logger.info('Heartbeat to {} succeeded.'.format(node_index))
+                if hb_success_error_lock:
+                    with hb_success_error_lock:
+                        hb_success_error_cnt[0] += 1
             elif response.failed_for_term:
                 # voter's term is larger than the leader, so leader changes to follower
+                if hb_success_error_lock:
+                    with hb_success_error_lock:
+                        hb_success_error_lock[1] += 1
                 self.convert_to_follower(response.term, node_index)
             else:
                 # AppendEntries failed because of log inconsistency
@@ -317,20 +336,16 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
                 self.decrement_nextIndex(node_index)
                 self.heartbeat_once_to_one(ip, port, node_index)
 
-    def heartbeat_once_to_all(self, is_sync_entry=True):
+    def heartbeat_once_to_all(self, hb_success_error_cnt=list(), hb_success_error_lock=None, is_sync_entry=True):
         self.logger.info('Start sending heartbeat_once_to_all.')
-        threads = []
         for node_index, ip_port_tuple in enumerate(self.configs['nodes']):
             ip = ip_port_tuple[0]
             port = ip_port_tuple[1]
             if ip == self.myIp and port == self.myPort:
                 continue
-            ae_thread = threading.Thread(target=self.heartbeat_once_to_one, args=(ip, port, node_index, is_sync_entry))
-            threads.append(ae_thread)
+            ae_thread = threading.Thread(target=self.heartbeat_once_to_one, args=(ip, port, node_index, hb_success_error_cnt,
+                                                                                  hb_success_error_lock, is_sync_entry))
             ae_thread.start()
-
-        for t in threads:
-            t.join()
 
     def generate_append_entry_request(self, node_index):
         request = storage_service_pb2.AppendEntriesRequest()
@@ -361,7 +376,6 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
                 entry.key = str(es[i][0])
                 entry.value = str(es[i][1])
                 entry.term = int(terms[i])
-
         request.senderIndex = self.node_index
         return request, new_nextIndex
 
@@ -598,7 +612,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
 
     def convert_to_follower(self, term, new_leader_id, is_persist=True):
         if self.state > 0:
-            self.logger.warning('{} converts to follower in term {}'.format(self.node_index, self.currentTerm))
+            self.logger.warning('{} converts to follower in term {}'.format(self.node_index, term))
 
         # do we need to reset the votedFor value? No
         self.state = 0
@@ -627,13 +641,13 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         self.ask_for_vote_to_all()
 
 
-    def convert_to_leader(self):
-        self.logger.warning('{} converts to leader in term {}'.format(self.node_index, self.currentTerm))
+    def convert_to_leader(self): 
         self.cancel_election_timer()
         self.state = 2
         self.leaderIndex = self.node_index
         self.persist()
         self.set_heartbeat_timer()
+        self.logger.warning('{} converts to leader in term {}'.format(self.node_index, self.currentTerm))
 
     def ask_for_vote_to_all(self):
         # send RPC requests to all other nodes
