@@ -1,6 +1,5 @@
 # kv-storage-system-based-on-raft
 
-
 A fault-tolerant distributed k/v storage system based on RAFT
 
 Team member:
@@ -47,10 +46,41 @@ Examples:
 3. `python client.py config.txt debug all`
 
 To start a request from client, run client.py and input parameters. To get the value of a certain key,
-input `get` and followed by the `key` (shown as example1); to put a key/value pair into to dictionary, 
-input `put` and followed by the k/v pair (shown as example2); to debug the server, input `debug` followed by 
+input `get` followed by the `key` (shown as example1); to put a key/value pair into to dictionary, 
+input `put` followed by the k/v pair (shown as example2); to debug the server, input `debug` followed by 
 debug parameters and optional ip/port (shown as example3). When the input pattern does not follow the above
-priciples, it will output "Invalid operation".
+principles, it will output "Invalid operation".
+
+**Chaosmonkey Client Request**
+
+COMMAND:
+
++ `python chaos_client.py CONFIG OPERATION ARGVs`
+
+The command allows interactively upload/modify the Connection Matrix (ConnMat) and kill a specified node 
+to simulate the dynamic network conditions. Also, it can get the Connection Matrix (ConnMat) by setting the 
+command parameter.
+
+Examples:
+
+1. `python chaos_client.py config.txt upload matrix`
+
+2. `python chaos_client.py config.txt edit 3 4 0.6`
+
+3. `python chaos_client.py config.txt get`
+
+4. `python chaos_client.py config.txt kill 1`
+
+To start a request from chaosmonkey client, run chaos_client.py and input parameters. To upload a matrix to
+servers, input `upload` followed by the path of matrix file; to edit/update an entry in the Connection Matrix,
+input `edit` followed by the position and value of target entry; to get the current Connection Matrix, input
+`get`; to kill a specified server, input `kill` followed by node index. When the input pattern does not follow 
+the above principles, it will output "Invalid operation".
+
+**Static and Dynamic Test**
+
+COMMAND
+
 
 
 
