@@ -200,11 +200,6 @@ def dynamic_test():
         put_stats = PutStats()
         get_stats = GetStats()
         print('=====================================================================')
-        print('Process: {} / {}'.format(loop_cnt, LOOP_CNT))
-        leader_index, leader_ip, leader_port = client.get_leader()
-        print('Present leader is node #{} at {}:{}'.format(leader_index, leader_ip, leader_port))
-
-        print('---------------------------------------------------------------------')
 
         time_when_entering_loop = time.time()
         while time.time() - time_when_entering_loop < duration:
@@ -233,6 +228,12 @@ def dynamic_test():
         get_stats.no_of_get = no_of_get
         if no_of_get != 0:
             get_stats.report()
+
+        print('Process: {} / {}'.format(loop_cnt, LOOP_CNT))
+        leader_index, leader_ip, leader_port = client.get_leader()
+        print('Present leader is node #{} at {}:{}'.format(leader_index, leader_ip, leader_port))
+
+        print('---------------------------------------------------------------------')
 
         if node_killed == -1:
             # no node is killed, so now kill one
@@ -287,5 +288,5 @@ def test_kill_leader():
 
 if __name__ == '__main__':
     # static_test()
-    # dynamic_test()
-    test_kill_leader()
+    dynamic_test()
+    # test_kill_leader()

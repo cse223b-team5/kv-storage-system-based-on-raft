@@ -50,8 +50,8 @@ def network(func):
             time.sleep(1)
             return func(obj, None, context)
         else:
-            if random.random() < float(conn_mat[obj.node_index][sender_index]):
-                time.sleep(1)
+            # if random.random() < float(conn_mat[obj.node_index][sender_index]):
+            #     time.sleep(1)
             return func(obj, request, context)
     return wrapper_network
 
