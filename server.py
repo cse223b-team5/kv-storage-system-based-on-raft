@@ -46,10 +46,12 @@ def network(func):
 
         if random.random() < float(conn_mat[sender_index][obj.node_index]):
             # TODO: what about the connection between clients and servers?
-            # drop this message
+            # ignore this message
             time.sleep(1)
             return func(obj, None, context)
         else:
+            if random.random() < float(conn_mat[obj.node_index][sender_index]):
+                time.sleep(1)
             return func(obj, request, context)
     return wrapper_network
 
@@ -264,6 +266,8 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
             response.value = str(self.nextIndex)
         elif request.variable == 'log':
             response.value = str(self.storage)
+        elif request.variable == 'conn_mat':
+            response.value = str(conn_mat)
         elif request.variable == 'all':
             response.value = str(self.__dict__)
         else:
@@ -334,7 +338,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
                 self.logger.error('Node #{} When heartbeat to node{}, inconsistency detected.'.
                                   format(self.node_index, node_index))
                 self.decrement_nextIndex(node_index)
-                self.heartbeat_once_to_one(ip, port, node_index)
+                self.heartbeat_once_to_one(ip, port, node_index, hb_success_error_cnt, hb_success_error_lock)
 
     def heartbeat_once_to_all(self, hb_success_error_cnt=list(), hb_success_error_lock=None, is_sync_entry=True):
         self.logger.info('Start sending heartbeat_once_to_all.')
