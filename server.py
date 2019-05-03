@@ -285,8 +285,8 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         # no need to sync entries, ensure own leadership
 
         hb_success_error_cnt = list()
-        hb_success_error_cnt.add(0)
-        hb_success_error_cnt.add(0)
+        hb_success_error_cnt.append(0)
+        hb_success_error_cnt.append(0)
         self.heartbeat_once_to_all(hb_success_error_cnt, False)
 
         majority_cnt = len(self.configs['nodes']) // 2 + 1
