@@ -1,8 +1,9 @@
+import random
+import time
+import sys
 from client import Client
 from chaos_client import ChaosMonkey
 from utils import load_config
-import random
-import time
 
 NO_of_PUTS = 100
 NO_of_GETS = 100  # in seconds
@@ -145,7 +146,7 @@ def test_and_report():
     print('---------------------------------------------------------------------')
 
 
-def static_test():
+def start_static_test():
     print('---------------------------------------------------------------------')
     print('Static network condition. All nodes are alive.')
     print('NO_of_PUTS: {}'.format(NO_of_PUTS))
@@ -187,7 +188,7 @@ def static_test():
     print('---------------------------------------------------------------------')
 
 
-def dynamic_test():
+def start_dynamic_test():
     print('Test with dynamic network condition. Nodes might die and revive.')
 
     node_killed = -1
@@ -287,6 +288,14 @@ def test_kill_leader():
 
 
 if __name__ == '__main__':
+    test_type = sys.argv[1]
+    if test_type == 'static':
+        start_static_test()
+    elif test_type == 'dynamic':
+        start_dynamic_test()
+    else:
+        print("Invalid operation")
+
     # static_test()
-    dynamic_test()
+    #dynamic_test()
     # test_kill_leader()

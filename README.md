@@ -3,8 +3,11 @@
 A fault-tolerant distributed k/v storage system based on RAFT
 
 Team member:
+
 1. Jie Lu
+
 1. Ling Hong
+
 3. Shuwei Liang
 
 Related site: http://cseweb.ucsd.edu/~gmporter/classes/sp19/cse223b/techreport/
@@ -79,7 +82,26 @@ the above principles, it will output "Invalid operation".
 
 **Static and Dynamic Test**
 
-COMMAND
+COMMAND:
+
++ `python test.py OPERATION`
+
++ `python concurrent_test.py OPERATION`
+
+The command allows statically and dynamically test the performance and correctness of the distributed k/v storage
+system. The tester sends hundreds of get requests or put requests within limited time. 
+
+Examples:
+
+1. `python test.py static`
+
+2. `python test.py dynamic`
+
+3. `python concurrent_test.py static`
+
+4. `python concurrent_test.py dynamic`
+
+
 
 
 
