@@ -296,8 +296,9 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         self.heartbeat_once_to_all(hb_success_error_cnt, hb_success_error_lock, False)
 
         majority_cnt = len(self.configs['nodes']) // 2 + 1
+        start_time = time.time()
         while hb_success_error_cnt[0] < majority_cnt and hb_success_error_cnt[1] == 0:
-            if not self.check_is_leader():
+            if not self.check_is_leader() or time.time() - start_time > 1:
                 break
             continue
 
