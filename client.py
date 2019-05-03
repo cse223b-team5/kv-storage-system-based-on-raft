@@ -161,7 +161,7 @@ if __name__ == '__main__':
         variable = sys.argv[3]
         if len(sys.argv) >= 5:
             ip = sys.argv[4]
-            port = sys.argc[5]
+            port = sys.argv[5]
             client.debug_get_variable(variable, ip, port)
         else:
             client.debug_get_variable(variable)

@@ -266,6 +266,8 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
             response.value = str(self.nextIndex)
         elif request.variable == 'log':
             response.value = str(self.storage)
+        elif request.variable == 'conn_mat':
+            response.value = str(conn_mat)
         elif request.variable == 'all':
             response.value = str(self.__dict__)
         else:
