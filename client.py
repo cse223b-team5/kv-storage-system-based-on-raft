@@ -43,6 +43,12 @@ class Client:
         #       0 for succeeded
         #       1 for redirect
         #       2 for unknown
+
+        #   RPC Put():
+        #   return if_succeeded
+        #       1 for none_request
+        #       2 for cur_server_is_not_leader, tailed with leader_ip, leader_port
+        #       3 exceed_time_limit
         with grpc.insecure_channel(self.leader_ip + ':' + self.leader_port) as channel:
             stub = storage_service_pb2_grpc.KeyValueStoreStub(channel)
             try:
@@ -50,7 +56,7 @@ class Client:
                     key=key, value=value, serial_no=str(random.randint(0, 10000))))
                 if response.ret == 0:
                     return 0, (0, 0)  # if_succeed, (ip, port)
-                elif response.ret == 1 and response.leader_ip != '' and response.leader_port != '':
+                elif response.ret == 2 and response.leader_ip != '' and response.leader_port != '':
                     return 1, (response.leader_ip, response.leader_port)
                 else:
                     return 2, (0, 0)
@@ -84,6 +90,8 @@ class Client:
                     print('Success!')
                 return 0
             elif once_ret[0] == 1:
+                print('New leader addr is: {}, current leader is: {}:{}'.
+                      format(once_ret[1], self.leader_ip, self.leader_port),)
                 self.leader_ip, self.leader_port = once_ret[1]
                 continue
             elif once_ret[0] == 2:

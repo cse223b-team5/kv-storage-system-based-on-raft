@@ -85,7 +85,9 @@ class ChaosMonkey():
             print('Invalid node_id.')
             return 1
         for id in range(len(self.configs['nodes'])):
+            # print('ID: {}, node: {}'.format(id, node_id))
             self.editMatrix(id, node_id, 0.0)
+            # print('first edited')
             self.editMatrix(node_id, id, 0.0)
         return 0
 
