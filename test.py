@@ -6,7 +6,7 @@ import time
 
 NO_of_PUTS = 100
 NO_of_GETS = 100  # in seconds
-LOOP_CNT = 4  # kill and revive nodes for LOOP_CNT times, should be even
+LOOP_CNT = 10  # kill and revive nodes for LOOP_CNT times, should be even
 
 client = Client('config.txt')
 chaosmonkey = ChaosMonkey('config.txt')
@@ -21,7 +21,6 @@ keys = list()
 def generate_kv():
     key = random.randint(0, 99999)
     value = random.randint(0, 99999)
-    put_records[key] = value
     return key, value
 
 
@@ -112,6 +111,40 @@ class GetStats:
         print('get_failed_after_many_attempts: {}'.format(self.get_failed_after_many_attempts))
 
 
+def test_and_report():
+    print('---------------------------------------------------------------------')
+    duration = 5
+    no_of_put, no_of_get = 0, 0
+    put_stats = PutStats()
+    get_stats = GetStats()
+    time_when_entering_loop = time.time()
+    while time.time() - time_when_entering_loop < duration:
+        key, value = generate_kv()
+        ret = client.put(key, value)
+        if ret == 0:
+            # succeeded
+            keys.append(key)
+            put_records[key] = value
+        put_stats.update(ret)
+        no_of_put += 1
+    put_stats.duration = duration
+    put_stats.no_of_put = no_of_put
+    if no_of_put != 0:
+        put_stats.report()
+    print('---------------------------------------------------------------------')
+    time_when_entering_loop = time.time()
+    while time.time() - time_when_entering_loop < duration:
+        key = get_a_random_key()
+        ret = client.get(key)
+        get_stats.update(ret, key)
+        no_of_get += 1
+    get_stats.duration = duration
+    get_stats.no_of_get = no_of_get
+    if no_of_get != 0:
+        get_stats.report()
+    print('---------------------------------------------------------------------')
+
+
 def static_test():
     print('---------------------------------------------------------------------')
     print('Static network condition. All nodes are alive.')
@@ -125,7 +158,10 @@ def static_test():
     for _ in range(NO_of_PUTS):
         key, value = generate_kv()
         ret = client.put(key, value)
-        keys.append(key)
+        if ret[0] == 0:
+            # succeeded
+            keys.append(key)
+            put_records[key] = value
         put_stats.update(ret)
         # time.sleep(0.1)
     end = time.time()
@@ -159,48 +195,60 @@ def dynamic_test():
 
     while loop_cnt < LOOP_CNT:
         loop_cnt += 1
-
-        time_when_entering_loop = time.time()
-        duration = random.randint(5, 10)
+        duration = 5
         no_of_put, no_of_get = 0, 0
         put_stats = PutStats()
         get_stats = GetStats()
+        print('=====================================================================')
 
-        while time.time() - time_when_entering_loop < duration * 0.5:
+        time_when_entering_loop = time.time()
+        while time.time() - time_when_entering_loop < duration:
             key, value = generate_kv()
             ret = client.put(key, value)
-            keys.append(key)
+            if ret == 0:
+                # succeeded
+                keys.append(key)
+                put_records[key] = value
             put_stats.update(ret)
             no_of_put += 1
+        put_stats.duration = duration
+        put_stats.no_of_put = no_of_put
+        if no_of_put != 0:
+            put_stats.report()
+
+        print('---------------------------------------------------------------------')
+
+        time_when_entering_loop = time.time()
         while time.time() - time_when_entering_loop < duration:
             key = get_a_random_key()
             ret = client.get(key)
             get_stats.update(ret, key)
             no_of_get += 1
-        print('---------------------------------------------------------------------')
-        put_stats.duration = duration * 0.5
-        get_stats.duration = duration * 0.5
-        put_stats.no_of_put = no_of_put
+        get_stats.duration = duration
         get_stats.no_of_get = no_of_get
+        if no_of_get != 0:
+            get_stats.report()
 
         print('Process: {} / {}'.format(loop_cnt, LOOP_CNT))
-        put_stats.report()
-        print('\n')
-        get_stats.report()
-
         leader_index, leader_ip, leader_port = client.get_leader()
         print('Present leader is node #{} at {}:{}'.format(leader_index, leader_ip, leader_port))
+
+        print('---------------------------------------------------------------------')
 
         if node_killed == -1:
             # no node is killed, so now kill one
             ret = chaosmonkey.kill_a_node_randomly()
+            print('Selected node #{} to kill.'.format(ret[1]))
             if ret[0] == 0:
                 node_killed = ret[1]
                 print('Killed node {}.'.format(ret[1]))
+                if node_killed == leader_index:
+                    print('************* Killed node is leader *************')
             else:
                 print('Failed to kill a node.')
         else:
             # one node is already killed, so noe revive it
+            print('Selected node #{} to revive.'.format(node_killed))
             ret = chaosmonkey.revive_a_node(node_killed)
             if ret == 0:
                 print('Node {} is revived.'.format(node_killed))
@@ -208,10 +256,37 @@ def dynamic_test():
             else:
                 print('Node {} cannot be revived.'.format(node_killed))
 
-        print('Sleep for 3 sec for new election.')
+        print('Sleep for 2 sec for new election.')
+        time.sleep(2)
+    print('=====================================================================')
+
+
+def test_kill_leader():
+    print('=====================================================================')
+    print('Test of killing leader.')
+
+    test_and_report()
+
+    leader_index, leader_ip, leader_port = client.get_leader()
+    print('Present leader is node #{} at {}:{}'.format(leader_index, leader_ip, leader_port))
+    ret = chaosmonkey.kill_a_node(leader_index)
+    if ret == 0:
+        print('Leader has been killed')
+    else:
+        print('Failed to kill a node.')
+
+    print('Sleep for 5 sec for new election.')  # election timer is expected to be around 2-3 seconds
+    time.sleep(5)
     print('---------------------------------------------------------------------')
+    print('After killing the leader and slept for 5 seconds, retest the service.')
+    test_and_report()
+
+    leader_index, leader_ip, leader_port = client.get_leader()
+    print('New leader is node #{} at {}:{}'.format(leader_index, leader_ip, leader_port))
+    print('=====================================================================')
 
 
 if __name__ == '__main__':
-    #static_test()
+    # static_test()
     dynamic_test()
+    # test_kill_leader()

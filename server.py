@@ -50,8 +50,8 @@ def network(func):
             time.sleep(1)
             return func(obj, None, context)
         else:
-            if random.random() < float(conn_mat[obj.node_index][sender_index]):
-                time.sleep(1)
+            # if random.random() < float(conn_mat[obj.node_index][sender_index]):
+            #     time.sleep(1)
             return func(obj, request, context)
     return wrapper_network
 
@@ -443,8 +443,10 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         self.replicate_log_entries_to_all(ae_succeed_cnt)
 
         majority_cnt = len(self.configs['nodes']) // 2 + 1
+
+        start_time = time.time()
         while ae_succeed_cnt[0] < majority_cnt:
-            if not self.check_is_leader():
+            if not self.check_is_leader() or time.time() - start_time > 1:
                 return storage_service_pb2.PutResponse(ret=1)
             continue
 
