@@ -276,7 +276,6 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         #   0 for succeeded, tailed with value
         #   1 for redirect, tailed with leader_ip and leader_port
         #   2 for key_not_found / none request
-        start = time.time()
         if request is None:
             return storage_service_pb2.GetResponse(ret=2)
 
@@ -300,12 +299,8 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
 
         # this is a synchronous function call, return when heartbeats to all nodes have returned
         if self.check_is_leader() and request.key in self.storage:
-            end = time.time()
-            print('duration of Get() procession: {}'.format(str(end - start)))
             return storage_service_pb2.GetResponse(value=str(self.storage[request.key]), ret=0)
         else:
-            end = time.time()
-            print('duration of Get() procession: {}'.format(str(end - start)))
             return storage_service_pb2.GetResponse(ret=2)
 
     def heartbeat_once_to_one(self, ip, port, node_index, hb_success_error_cnt, hb_success_error_lock, is_sync_entry=True):
@@ -365,7 +360,8 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         if request.prevLogIndex < 0:
             request.prevLogTerm = 0
         else:
-            print('Node #{}: len(log_term) and preLogIndex: {}, {}'.format(self.node_index, len(self.log_term), request.prevLogIndex))
+            # print('Node #{}: len(log_term) and preLogIndex: {}, {}'.
+            #       format(self.node_index, len(self.log_term), request.prevLogIndex))
             request.prevLogTerm = self.log_term[request.prevLogIndex]
         request.leaderCommit = self.commitIndex
 

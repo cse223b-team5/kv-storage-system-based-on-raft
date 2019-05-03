@@ -4,8 +4,8 @@ from utils import load_config
 import random
 import time
 
-NO_of_PUTS = 1000
-NO_of_GETS = 10  # in seconds
+NO_of_PUTS = 100
+NO_of_GETS = 100  # in seconds
 LOOP_CNT = 4  # kill and revive nodes for LOOP_CNT times, should be even
 
 client = Client('config.txt')
