@@ -46,10 +46,12 @@ def network(func):
 
         if random.random() < float(conn_mat[sender_index][obj.node_index]):
             # TODO: what about the connection between clients and servers?
-            # drop this message
+            # ignore this message
             time.sleep(1)
             return func(obj, None, context)
         else:
+            if random.random() < float(conn_mat[obj.node_index][sender_index]):
+                time.sleep(1)
             return func(obj, request, context)
     return wrapper_network
 
