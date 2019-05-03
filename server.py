@@ -334,7 +334,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
                 self.logger.error('Node #{} When heartbeat to node{}, inconsistency detected.'.
                                   format(self.node_index, node_index))
                 self.decrement_nextIndex(node_index)
-                self.heartbeat_once_to_one(ip, port, node_index)
+                self.heartbeat_once_to_one(ip, port, node_index, hb_success_error_cnt, hb_success_error_lock)
 
     def heartbeat_once_to_all(self, hb_success_error_cnt=list(), hb_success_error_lock=None, is_sync_entry=True):
         self.logger.info('Start sending heartbeat_once_to_all.')
@@ -439,8 +439,10 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         self.replicate_log_entries_to_all(ae_succeed_cnt)
 
         majority_cnt = len(self.configs['nodes']) // 2 + 1
+
+        start_time = time.time()
         while ae_succeed_cnt[0] < majority_cnt:
-            if not self.check_is_leader():
+            if not self.check_is_leader() or time.time() - start_time > 1:
                 return storage_service_pb2.PutResponse(ret=1)
             continue
 
