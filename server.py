@@ -771,9 +771,23 @@ def serve(config_path, myIp, myPort):
         server.stop(0)
 
 
+def show_thread_cnt_func():
+    while True:
+        print('Active threads: {}.'.format(threading.active_count()))
+        time.sleep(2)
+
+
+def show_thread_cnt():
+    x = threading.Thread(target=show_thread_cnt_func)
+    x.start()
+
+
 if __name__ == '__main__':
     logging.basicConfig()
     config_path = sys.argv[1]
     myIp = sys.argv[2]
     myPort = sys.argv[3]
+
+    # show_thread_cnt()
+
     serve(config_path, myIp, myPort)

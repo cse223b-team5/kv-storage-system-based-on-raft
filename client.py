@@ -90,8 +90,8 @@ class Client:
                     print('Success!')
                 return 0
             elif once_ret[0] == 1:
-                print('New leader addr is: {}, current leader is: {}:{}'.
-                      format(once_ret[1], self.leader_ip, self.leader_port),)
+                # print('New leader addr is: {}, current leader is: {}:{}'.
+                #       format(once_ret[1], self.leader_ip, self.leader_port),)
                 self.leader_ip, self.leader_port = once_ret[1]
                 continue
             elif once_ret[0] == 2:
