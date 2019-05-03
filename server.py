@@ -285,9 +285,10 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         # no need to sync entries, ensure own leadership
 
         hb_success_error_cnt = list()
-        hb_success_error_cnt.add(0)
-        hb_success_error_cnt.add(0)
-        self.heartbeat_once_to_all(hb_success_error_cnt, False)
+        hb_success_error_cnt.append(0)
+        hb_success_error_cnt.append(0)
+        hb_success_error_lock = threading.Lock()
+        self.heartbeat_once_to_all(hb_success_error_cnt, hb_success_error_lock, False)
 
         majority_cnt = len(self.configs['nodes']) // 2 + 1
         while hb_success_error_cnt[0] < majority_cnt and hb_success_error_cnt[1] == 0:
@@ -315,12 +316,14 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
             if response.success:
                 self.update_nextIndex_and_matchIndex(node_index, new_nextIndex)
                 self.logger.info('Heartbeat to {} succeeded.'.format(node_index))
-                with hb_success_error_lock:
-                    hb_success_error_cnt[0] += 1
+                if hb_success_error_lock:
+                    with hb_success_error_lock:
+                        hb_success_error_cnt[0] += 1
             elif response.failed_for_term:
                 # voter's term is larger than the leader, so leader changes to follower
-                with hb_success_error_lock:
-                    hb_success_error_lock[1] += 1
+                if hb_success_error_lock:
+                    with hb_success_error_lock:
+                        hb_success_error_lock[1] += 1
                 self.convert_to_follower(response.term, node_index)
             else:
                 # AppendEntries failed because of log inconsistency
@@ -332,9 +335,8 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
                 self.decrement_nextIndex(node_index)
                 self.heartbeat_once_to_one(ip, port, node_index)
 
-    def heartbeat_once_to_all(self, hb_success_error_cnt, is_sync_entry=True):
+    def heartbeat_once_to_all(self, hb_success_error_cnt=list(), hb_success_error_lock=None, is_sync_entry=True):
         self.logger.info('Start sending heartbeat_once_to_all.')
-        hb_success_error_lock = threading.Lock()
         for node_index, ip_port_tuple in enumerate(self.configs['nodes']):
             ip = ip_port_tuple[0]
             port = ip_port_tuple[1]
