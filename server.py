@@ -424,14 +424,19 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
                 ae_thread.start()
 
     def Put(self, request, context):
+        # return if_succeeded
+        #   1 for none_request
+        #   2 for cur_server_is_not_leader, tailed with leader_ip, leader_port
+        #   3 exceed_time_limit
         if request is None:
             return storage_service_pb2.PutResponse(ret=1)
 
         #  check if current node is leader. if not, help client redirect
         if not self.check_is_leader():
+            print('Currrent node: {}, leaderIndex: {}'.format(self.node_index, self.leaderIndex))
             ip = self.configs['nodes'][self.leaderIndex][0]
             port = self.configs['nodes'][self.leaderIndex][1]
-            return storage_service_pb2.PutResponse(ret=1, leader_ip=ip, leader_port=port)
+            return storage_service_pb2.PutResponse(ret=2, leader_ip=ip, leader_port=port)
 
         # to guarantee the 'at-most-once' rule; check commit history
         client_id = str(context.peer())
@@ -449,13 +454,13 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
 
         start_time = time.time()
         while ae_succeed_cnt[0] < majority_cnt:
-            if not self.check_is_leader() or time.time() - start_time > 1:
-                return storage_service_pb2.PutResponse(ret=1)
+            if not self.check_is_leader():
+                ip = self.configs['nodes'][self.leaderIndex][0]
+                port = self.configs['nodes'][self.leaderIndex][1]
+                return storage_service_pb2.PutResponse(ret=2, leader_ip=ip, leader_port=port)
+            elif time.time() - start_time > 1:
+                return storage_service_pb2.PutResponse(ret=3)
             continue
-
-        if ae_succeed_cnt[0] < majority_cnt:
-            # client request failed
-            return storage_service_pb2.PutResponse(ret=1)
 
         # update commitIndex
         self.update_commit_index()
@@ -553,6 +558,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
             # 5 when there is partial partition and two leader has different commitIndex so use the outside "max"
             self.commitIndex = max(self.commitIndex, min(request.leaderCommit, len(self.log) - 1))
 
+            self.leaderIndex = request.leaderId
             self.convert_to_follower(request.term, request.leaderId)
         return storage_service_pb2.AppendEntriesResponse(term=self.currentTerm, success=True)
 
@@ -627,7 +633,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         self.state = 0
         self.voteCnt = 0
         self.currentTerm = term
-        self.leaderIndex = new_leader_id
+        # self.leaderIndex = new_leader_id
 
         if is_persist:
             self.persist()

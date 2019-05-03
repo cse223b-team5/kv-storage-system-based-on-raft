@@ -257,7 +257,7 @@ def dynamic_test():
                 print('Node {} cannot be revived.'.format(node_killed))
 
         print('Sleep for 2 sec for new election.')
-        time.sleep(2)
+        time.sleep(5)
     print('=====================================================================')
 
 
