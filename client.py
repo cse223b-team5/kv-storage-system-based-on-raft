@@ -159,11 +159,22 @@ if __name__ == '__main__':
     operation = sys.argv[2]
     if operation == 'get':
         key = sys.argv[3]
+        if_print = sys.argv[4]
         client.get(key)
+        if if_print == "true":
+            PRINT_RESULT = True
+        else:
+            PRINT_RESULT = False
     elif operation == 'put':
         key = sys.argv[3]
         value = sys.argv[4]
+        if_print = sys.argv[5]
         client.put(key, value)
+        client.get(key)
+        if if_print == "true":
+            PRINT_RESULT = True
+        else:
+            PRINT_RESULT = False
     elif operation == 'debug':
         # python client.py config.txt debug all localhost 5001
         variable = sys.argv[3]
