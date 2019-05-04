@@ -190,8 +190,12 @@ class ConcurrentTester:
         self.test_duration = test_duration # s/ for each test client
         self.test_type = test_type        # {0: "static_test", 1: "dynamic_test"}
         self.concurrent_type = concurrent_type # as CONCURRENT_TYPES shows
+        self.get_ratio = 0
         self._lock = threading.Lock()
         self.put_records_all = {}
+        
+    def set_get_ratio(self, get_ratio):
+       self.get_ratio = get_ratio
 
     def test(self):
         cts = []
@@ -217,7 +221,7 @@ class ConcurrentTester:
         key_range = "{}_{}".format(key_start, key_end)
         put_record = self.put_records_all[key_range] if key_range in self.put_records_all else {}
         tester = Tester(self.test_type, self.concurrent_type, self.test_duration,
-                        key_start, key_end, put_record)
+                        key_start, key_end, put_record, self.get_ratio)
         tester.test()
         with self._lock:
             self.success_cnt += tester.success_cnt
@@ -267,6 +271,8 @@ def start_static_test():
     #
     # static concurrent_put_get_by_ratio
     static_put_get_ratio_ct = ConcurrentTester(0, 3, NO_of_CONCURRENCY, TIME_of_TEST)
+    static_put_get_ratio_ct.set_get_ratio(0.65)
+
     static_put_get_ratio_ct.test()
 
 def start_dynamic_test():
