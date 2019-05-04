@@ -214,7 +214,10 @@ class ConcurrentTester:
             self.total_cnt += tester.total_cnt
             self.end_time = max(self.end_time, tester.end_time)
         if self.concurrent_type == 0:
-            # save put results for get test
+            # save put results for statical get test
+            self.put_records_all[key_range] = tester.put_records
+        elif self.concurrent_type == 1:
+            # save put results for dynamic get test
             self.put_records_all[key_range] = tester.put_records
 
     def report(self):
@@ -252,7 +255,15 @@ def start_static_test():
     # static_get_ct.test()
 
 def start_dynamic_test():
-    pass
+    # dynamic concurrent put test
+    dynamic_put_ct = ConcurrentTester(1, 0, 10, 5)
+    dynamic_put_ct.test()
+
+    # dynamic concurrent get test
+
+    # dynamic concurrent_put_get_orderly
+
+    # dynamic concurrent_put_get_by_ratio
 
 if __name__ == '__main__':
     test_type = sys.argv[1]
