@@ -55,11 +55,10 @@ class NewGetStats:
     def update(self, ret, key):
         self.no_of_get += 1
         if ret[0] == 0:
-            self.get_succeed_cnt += 1
-            if key in self.put_records and ret[1] == self.put_records[key]: 
-                self.get_succeed_and_correct_cnt += 1
+            if key in self.put_records and int(ret[1]) == self.put_records[key]: 
+                self.get_succeed_cnt += 1
         elif ret[0] == 1 and key not in self.put_records:
-            self.get_succeed_and_correct_cnt += 1
+            self.get_succeed_cnt += 1
         elif ret[0] == 1 and key in self.put_records:
             self.get_key_doesnt_exist_cnt += 1
         elif ret[0] == 2:
@@ -199,12 +198,13 @@ class ConcurrentTester:
 
     def test(self):
         cts = []
-        N = 30
+        N = 5
+        M = 200
         self.start_time = time.time()
         for i in range(self.clients_cnt):
             try:
-                key_start = i * N
-                key_end = (i + 1) * N
+                key_start = i * N + M
+                key_end = (i + 1) * N + M
                 client_thread = threading.Thread(target=self.run_one_client, args=(key_start, key_end))
                 cts.append(client_thread)
                 client_thread.start()
@@ -229,7 +229,7 @@ class ConcurrentTester:
             self.put_total_cnt += tester.put_total_cnt
             self.get_total_cnt += tester.get_total_cnt
             self.put_success_cnt += tester.put_success_cnt
-            self.put_success_cnt += tester.put_success_cnt
+            self.get_success_cnt += tester.get_success_cnt
             self.end_time = max(self.end_time, tester.end_time)
         if self.concurrent_type == 0:
             # save put results for get test
