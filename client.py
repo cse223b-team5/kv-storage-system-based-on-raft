@@ -90,8 +90,8 @@ class Client:
                     print('Success!')
                 return 0
             elif once_ret[0] == 1:
-                print('New leader addr is: {}, current leader is: {}:{}'.
-                      format(once_ret[1], self.leader_ip, self.leader_port),)
+                # print('New leader addr is: {}, current leader is: {}:{}'.
+                #       format(once_ret[1], self.leader_ip, self.leader_port),)
                 self.leader_ip, self.leader_port = once_ret[1]
                 continue
             elif once_ret[0] == 2:
@@ -159,11 +159,22 @@ if __name__ == '__main__':
     operation = sys.argv[2]
     if operation == 'get':
         key = sys.argv[3]
+        if_print = sys.argv[4]
         client.get(key)
+        if if_print == "true":
+            PRINT_RESULT = True
+        else:
+            PRINT_RESULT = False
     elif operation == 'put':
         key = sys.argv[3]
         value = sys.argv[4]
+        if_print = sys.argv[5]
         client.put(key, value)
+        client.get(key)
+        if if_print == "true":
+            PRINT_RESULT = True
+        else:
+            PRINT_RESULT = False
     elif operation == 'debug':
         # python client.py config.txt debug all localhost 5001
         variable = sys.argv[3]

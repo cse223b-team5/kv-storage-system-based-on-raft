@@ -159,7 +159,7 @@ def start_static_test():
     for _ in range(NO_of_PUTS):
         key, value = generate_kv()
         ret = client.put(key, value)
-        if ret[0] == 0:
+        if ret == 0:
             # succeeded
             keys.append(key)
             put_records[key] = value
