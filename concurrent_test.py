@@ -265,6 +265,7 @@ def start_static_test():
     static_get_ct.test()
     #
     # static concurrent_put_get_orderly
+
     static_put_get_ct = ConcurrentTester(0, 2, NO_of_CONCURRENCY, TIME_of_TEST)
     static_put_get_ct.test()
     #
@@ -276,6 +277,7 @@ def start_static_test():
 
 def start_dynamic_test():
     pass
+
 
 if __name__ == '__main__':
     test_type = sys.argv[1]
