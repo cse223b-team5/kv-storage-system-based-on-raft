@@ -63,9 +63,19 @@ class ChaosMonkey():
         if node_id < 0 or node_id >= len(self.configs['nodes']):
             print('Invalid node_id.')
             return 1
-        for id in range(len(self.configs['nodes'])):
-            self.editMatrix(id, node_id, 1.0)
-            self.editMatrix(node_id, id, 1.0)
+        # for id in range(len(self.configs['nodes'])):
+        #     self.editMatrix(id, node_id, 1.0)
+        #     self.editMatrix(node_id, id, 1.0)
+
+        all_correct = True
+        for ip, port in self.configs['nodes']:
+            with grpc.insecure_channel(ip + ':' + port) as channel:
+                stub = chaosmonkey_pb2_grpc.ChaosMonkeyStub(channel)
+                response = stub.KillANode(chaosmonkey_pb2.KillANodeRequest(node_index=node_id))
+                if response.ret == 1:
+                    all_correct = False
+        if not all_correct:
+            print('Kill node failed!')
         return 0
 
     def kill_a_node_randomly(self):

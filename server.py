@@ -433,7 +433,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
 
         #  check if current node is leader. if not, help client redirect
         if not self.check_is_leader():
-            print('Currrent node: {}, leaderIndex: {}'.format(self.node_index, self.leaderIndex))
+            # print('Currrent node: {}, leaderIndex: {}'.format(self.node_index, self.leaderIndex))
             ip = self.configs['nodes'][self.leaderIndex][0]
             port = self.configs['nodes'][self.leaderIndex][1]
             return storage_service_pb2.PutResponse(ret=2, leader_ip=ip, leader_port=port)
@@ -656,7 +656,6 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         self.reset_election_timer()
         self.ask_for_vote_to_all()
 
-
     def convert_to_leader(self): 
         self.cancel_election_timer()
         self.state = 2
@@ -724,6 +723,16 @@ class ChaosServer(chaosmonkey_pb2_grpc.ChaosMonkeyServicer):
     def __init__(self):
         global conn_mat
         conn_mat = load_matrix('matrix')
+        self.logger = self.set_log()
+
+    def set_log(self):
+        logger = Logger(-1)
+        # logger.addHandler(FileHandler("{}_{}.log".format(PERSISTENT_PATH_PREFIC, self.name)))
+        ch = StreamHandler()
+        ch.setFormatter(Formatter("%(asctime)s %(levelname)s %(message)s"))
+        logger.addHandler(ch)
+        logger.setLevel("WARNING")
+        return logger
 
     def UploadMatrix(self, request, context):
         global conn_mat
@@ -754,9 +763,21 @@ class ChaosServer(chaosmonkey_pb2_grpc.ChaosMonkeyServicer):
                 to_row.vals.append(element)
         return to_mat
 
+    def KillANode(self, request, context):
+        self.logger.warning('RPC KillANode() called.')
+        global conn_mat
+        node_index = request.node_index
+        N = len(conn_mat)
+        if node_index < 0 or node_index >= N:
+            return chaosmonkey_pb2.Status(ret=1)
+        for id in range(N):
+            conn_mat[id][node_index] = 1.0
+            conn_mat[node_index][id] = 1.0
+        return chaosmonkey_pb2.Status(ret=0)
+
 
 def serve(config_path, myIp, myPort):
-    server = grpc.server(futures.ThreadPoolExecutor(max_workers=100))
+    server = grpc.server(futures.ThreadPoolExecutor(max_workers=1000))
     storage_service_pb2_grpc.add_KeyValueStoreServicer_to_server(StorageServer(config_path, myIp, myPort), server)
     chaosmonkey_pb2_grpc.add_ChaosMonkeyServicer_to_server(ChaosServer(), server)
 
