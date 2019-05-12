@@ -6,6 +6,7 @@ service ChaosMonkey {
     rpc UploadMatrix(ConnMatrix) returns (Status) {}
     rpc UpdateValue(MatValue) returns (Status) {}
     rpc GetMatrix(Empty) returns (ConnMatrix) {}
+    rpc KillANode(KillANodeRequest) returns (Status) {}
 }
 
 enum StatusCode {
@@ -23,6 +24,11 @@ message ConnMatrix {
     }
     repeated MatRow rows = 1;
 }
+
+message KillANodeRequest {
+    int32 node_index = 1;
+}
+
 
 message MatValue {
     int32 row = 1;
