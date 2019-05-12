@@ -6,7 +6,7 @@ from client import Client
 from utils import load_config
 from chaos_client import ChaosMonkey
 
-NO_of_CONCURRENCY = 20
+NO_of_CONCURRENCY = 5
 TIME_of_TEST = 5  # s
 CONCURRENT_TYPES = {0: "concurrent_put", 1:"concurrent_get",
                     2: "concurrent_put_get_orderly", 3: "current_put_get_by_ratio"}
