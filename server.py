@@ -428,7 +428,9 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         #   1 for none_request
         #   2 for cur_server_is_not_leader, tailed with leader_ip, leader_port
         #   3 exceed_time_limit
+        # print('server {}: enter Put RPC'.format(self.node_index))
         if request is None:
+            # print('server: empty request')
             return storage_service_pb2.PutResponse(ret=1)
 
         #  check if current node is leader. if not, help client redirect
@@ -436,18 +438,20 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
             # print('Currrent node: {}, leaderIndex: {}'.format(self.node_index, self.leaderIndex))
             ip = self.configs['nodes'][self.leaderIndex][0]
             port = self.configs['nodes'][self.leaderIndex][1]
+            # print('server {}: redirect'.format(self.node_index))
             return storage_service_pb2.PutResponse(ret=2, leader_ip=ip, leader_port=port)
 
         # to guarantee the 'at-most-once' rule; check commit history
         client_id = str(context.peer())
         if client_id in self.last_commit_history:
             if request.serial_no == self.last_commit_history[client_id][0] and self.last_commit_history[client_id][1]:
+                # print('server: already submitted')
                 return storage_service_pb2.PutResponse(ret=0)
 
         self.append_to_local_log(request.key, request.value)
 
         ae_succeed_cnt = list()
-        ae_succeed_cnt.append(0)  # use list so that when pass-by-reference
+        ae_succeed_cnt.append(1)  # use list so that when pass-by-reference
         self.replicate_log_entries_to_all(ae_succeed_cnt)
 
         majority_cnt = len(self.configs['nodes']) // 2 + 1
@@ -457,8 +461,10 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
             if not self.check_is_leader():
                 ip = self.configs['nodes'][self.leaderIndex][0]
                 port = self.configs['nodes'][self.leaderIndex][1]
+                # print('server: redirect')
                 return storage_service_pb2.PutResponse(ret=2, leader_ip=ip, leader_port=port)
             elif time.time() - start_time > 1:
+                # print('server time out.')
                 return storage_service_pb2.PutResponse(ret=3)
             continue
 
@@ -478,6 +484,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
             print('----------------------------------------------------------------------')
 
         # respond to client
+        # print('Server: succeed!')
         return storage_service_pb2.PutResponse(ret=0)
 
     def update_commit_index(self):
@@ -764,7 +771,7 @@ class ChaosServer(chaosmonkey_pb2_grpc.ChaosMonkeyServicer):
         return to_mat
 
     def KillANode(self, request, context):
-        self.logger.warning('RPC KillANode() called.')
+        # self.logger.warning('RPC KillANode() called.')
         global conn_mat
         node_index = request.node_index
         N = len(conn_mat)

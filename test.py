@@ -4,6 +4,7 @@ import sys
 from client import Client
 from chaos_client import ChaosMonkey
 from utils import load_config
+import matplotlib.pyplot as plt
 
 NO_of_PUTS = 100
 NO_of_GETS = 100  # in seconds
@@ -287,12 +288,86 @@ def test_kill_leader():
     print('=====================================================================')
 
 
+def get_and_measure_individual(elapsed_time):
+    for i in range(NO_of_GETS):
+        key = get_a_random_key()
+        t1 = time.time()
+        ret = client.get(key)
+        t2 = time.time()
+        # print('ret is: {}, put_records[key]={}.'.format(ret, put_records[key]))
+        if ret[0] == 0 and int(ret[1]) == put_records[key]:
+            elapsed_time.append(round((t2-t1)*1000.0, 2))
+        else:
+            elapsed_time.append(0)
+
+
+def put_and_measure_individual(elapsed_time):
+    for i in range(NO_of_PUTS):
+        key, value = generate_kv()
+        t1 = time.time()
+        ret = client.put(key, value)
+        t2 = time.time()
+        # print('ret is: {}, put_records[key]={}.'.format(ret, put_records[key]))
+        if ret == 0:
+            elapsed_time.append(round((t2-t1)*1000.0, 2))
+        else:
+            elapsed_time.append(0)
+
+
+def show_elapsed_time(elapsed_time, n):
+    xs = range(len(elapsed_time))
+    plt.plot(xs, elapsed_time)
+    plt.show()
+
+    filename = 'exp5_put_#nodes_killed_'+str(n)+'.txt'
+    with open(filename, 'w') as f:
+        f.write(str(elapsed_time))
+
+
+def start_exp5(number_of_nodes):
+    elapsed_time = exp5_kill_k_nodes(number_of_nodes)
+    show_elapsed_time(elapsed_time, number_of_nodes)
+
+
+def exp5_kill_k_nodes(number_of_nodes_to_kill=1):
+    start_static_test()  # first put some data to log
+    elapsed_time = list()
+
+    # get_and_measure_individual(elapsed_time)
+    put_and_measure_individual(elapsed_time)
+
+    t1 = time.time()
+    ret = chaosmonkey.kill_k_nodes_randomly(number_of_nodes_to_kill)
+    t2 = time.time()
+    print('Kill nodes used time: {}'.format(t2-t1))
+    if ret == 0:
+        print('{} nodes killed'.format(number_of_nodes_to_kill))
+    else:
+        print('Failed to kill nodes!')
+
+    # get_and_measure_individual(elapsed_time)
+    put_and_measure_individual(elapsed_time)
+
+    failed_cnt = 0
+    for x in elapsed_time:
+        if x == 0:
+            failed_cnt += 1
+    print('{}/{} failed.'.format(failed_cnt, len(elapsed_time)))
+    print('---------------------------------------------------------------------')
+    return elapsed_time
+
+
 if __name__ == '__main__':
     test_type = sys.argv[1]
     if test_type == 'static':
         start_static_test()
     elif test_type == 'dynamic':
         start_dynamic_test()
+    elif test_type == 'exp5':
+        number_of_nodes = 1
+        if len(sys.argv) > 2:
+            number_of_nodes = sys.argv[2]
+        start_exp5(number_of_nodes)
     else:
         print("Invalid operation")
 
