@@ -35,6 +35,7 @@ class Client:
                 else:
                     return 3, 0, (0, 0)
             except Exception as e:
+                print(str(e))
                 return -1, 0, (0, 0)
 
     def put_once(self, key, value):
@@ -61,6 +62,7 @@ class Client:
                 else:
                     return 2, (0, 0)
             except Exception as e:
+                print(str(e))
                 return -1, (0, 0)
 
     def debug_get_variable(self, variable, ip=None, port=None):
@@ -100,7 +102,7 @@ class Client:
                 return 1
             else:
                 if PRINT_RESULT:
-                    print('Connection failed!')
+                    print('Connection failed! once_ret: {}'.format(once_ret))
                 return 2
         return 3
 
@@ -133,7 +135,7 @@ class Client:
                 return 2, 0
             else:
                 if PRINT_RESULT:
-                    print('Connection failed!')
+                    print('Connection failed! once_ret is: {}'.format(once_ret))
                 return 3, 0
         print('Failed after many attempts!')
         return 4, 0
@@ -150,6 +152,18 @@ class Client:
             leader_index += 1
         return leader_index, self.leader_ip, self.leader_port
 
+    def partition_network(self, num_of_nodes_with_leader):
+        # make the first num_of_nodes_with_leader nodes(or num_of_nodes_with_leader - 1) in the same partition as the leader
+        all_correct = True
+        for ip, port in self.configs['nodes']:
+            with grpc.insecure_channel(ip + ':' + port) as channel:
+                stub = storage_service_pb2_grpc.KeyValueStoreStub(channel)
+                response = stub.Partition(storage_service_pb2.PartitionRequest(num_of_nodes_with_leader = num_of_nodes_with_leader))
+                if response.ret == 1:
+                    all_correct = False
+        if not all_correct:
+            return 1
+        return 0
 
 if __name__ == '__main__':
     logging.basicConfig()
@@ -184,5 +198,12 @@ if __name__ == '__main__':
             client.debug_get_variable(variable, ip, port)
         else:
             client.debug_get_variable(variable)
+    elif operation == 'partition':
+        num_of_nodes_with_leader = int(sys.argv[3])
+        ret = client.partition_network(num_of_nodes_with_leader)
+        if ret == 0:
+            print('Partition Success!')
+        else:
+            print('Partition Failed!')
     else:
         print("Invalid operation")

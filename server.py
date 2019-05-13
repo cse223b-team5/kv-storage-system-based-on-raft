@@ -268,8 +268,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
             response.value = str(self.storage)
         elif request.variable == 'conn_mat':
             response.value = str(conn_mat)
-        elif request.variable == '' \
-                                 '':
+        elif request.variable == 'all':
             response.value = str(self.__dict__)
         else:
             response.value = 'Invaid variable.'
@@ -433,7 +432,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
 
         #  check if current node is leader. if not, help client redirect
         if not self.check_is_leader():
-            print('Currrent node: {}, leaderIndex: {}'.format(self.node_index, self.leaderIndex))
+            # print('Currrent node: {}, leaderIndex: {}'.format(self.node_index, self.leaderIndex))
             ip = self.configs['nodes'][self.leaderIndex][0]
             port = self.configs['nodes'][self.leaderIndex][1]
             return storage_service_pb2.PutResponse(ret=2, leader_ip=ip, leader_port=port)
@@ -656,11 +655,11 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         self.reset_election_timer()
         self.ask_for_vote_to_all()
 
-
     def convert_to_leader(self): 
         self.cancel_election_timer()
         self.state = 2
         self.leaderIndex = self.node_index
+        self.is_leader = True  #add on 5/12
         self.persist()
         self.set_heartbeat_timer()
         self.logger.warning('{} converts to leader in term {}'.format(self.node_index, self.currentTerm))
@@ -719,11 +718,77 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
             request.lastLogTerm = int(self.log_term[-1])
         return request
 
+    def Partition(self, request, context):
+        self.logger.warning('RPC Partition() called.')
+        num_of_nodes_with_leader = request.num_of_nodes_with_leader
+
+        if self.leaderIndex < num_of_nodes_with_leader:
+            if self.node_index < num_of_nodes_with_leader:
+                # set the matrix value of node_index from num_of_nodes_with_leader to n-1 to 1
+                for node_index in range(num_of_nodes_with_leader, len(self.configs['nodes'])):
+                    ret = self.partition_two_nodes(node_index)
+                    if ret == 1:
+                        return storage_service_pb2.PartitionResponse(ret=1)
+            else:
+                # set the matrix value of node_index from 0 to num_of_nodes_with_leader-1 to 1
+                for node_index in range(num_of_nodes_with_leader):
+                    ret = self.partition_two_nodes(node_index)
+                    if ret == 1:
+                        return storage_service_pb2.PartitionResponse(ret=1)
+        else:
+            if self.node_index < num_of_nodes_with_leader - 1:
+                # set the matrix value of node_index from num_of_nodes_with_leader-1 to n-1 except leaderIndex to 1
+                for node_index in range(num_of_nodes_with_leader-1, len(self.configs['nodes'])):
+                    if node_index == self.leaderIndex:
+                        continue
+                    ret = self.partition_two_nodes(node_index)
+                    if ret == 1:
+                        return storage_service_pb2.PartitionResponse(ret=1)
+            else:
+                # set the matrix value of node_index from 0 to num_of_nodes_with_leader-2 and leaderIndex to 1
+                if self.is_leader:
+                    for node_index in range(num_of_nodes_with_leader - 1, len(self.configs['nodes'])):
+                        if node_index == self.leaderIndex:
+                            continue
+                        ret = self.partition_two_nodes(node_index)
+                        if ret == 1:
+                            return storage_service_pb2.PartitionResponse(ret=1)
+                else: # not leader
+                    for node_index in range(num_of_nodes_with_leader-1):
+                        ret = self.partition_two_nodes(node_index)
+                        if ret == 1:
+                            return storage_service_pb2.PartitionResponse(ret=1)
+                    if self.node_index != self.leaderIndex:
+                        ret = self.partition_two_nodes(self.leaderIndex)
+                        if ret == 1:
+                            return storage_service_pb2.PartitionResponse(ret=1)
+        return storage_service_pb2.PartitionResponse(ret=0)
+
+    def partition_two_nodes(self, node_index):
+        global conn_mat
+        N = len(conn_mat)
+        if node_index < 0 or node_index >= N:
+            return 1
+        for id in range(N):
+            conn_mat[self.node_index][node_index] = 1.0
+            conn_mat[node_index][self.node_index] = 1.0
+        return 0
+
 
 class ChaosServer(chaosmonkey_pb2_grpc.ChaosMonkeyServicer):
     def __init__(self):
         global conn_mat
         conn_mat = load_matrix('matrix')
+        self.logger = self.set_log()
+
+    def set_log(self):
+        logger = Logger(-1)
+        # logger.addHandler(FileHandler("{}_{}.log".format(PERSISTENT_PATH_PREFIC, self.name)))
+        ch = StreamHandler()
+        ch.setFormatter(Formatter("%(asctime)s %(levelname)s %(message)s"))
+        logger.addHandler(ch)
+        logger.setLevel("WARNING")
+        return logger
 
     def UploadMatrix(self, request, context):
         global conn_mat
@@ -754,9 +819,21 @@ class ChaosServer(chaosmonkey_pb2_grpc.ChaosMonkeyServicer):
                 to_row.vals.append(element)
         return to_mat
 
+    def KillANode(self, request, context):
+        self.logger.warning('RPC KillANode() called.')
+        global conn_mat
+        node_index = request.node_index
+        N = len(conn_mat)
+        if node_index < 0 or node_index >= N:
+            return chaosmonkey_pb2.Status(ret=1)
+        for id in range(N):
+            conn_mat[id][node_index] = 1.0
+            conn_mat[node_index][id] = 1.0
+        return chaosmonkey_pb2.Status(ret=0)
+
 
 def serve(config_path, myIp, myPort):
-    server = grpc.server(futures.ThreadPoolExecutor(max_workers=100))
+    server = grpc.server(futures.ThreadPoolExecutor(max_workers=1000))
     storage_service_pb2_grpc.add_KeyValueStoreServicer_to_server(StorageServer(config_path, myIp, myPort), server)
     chaosmonkey_pb2_grpc.add_ChaosMonkeyServicer_to_server(ChaosServer(), server)
 

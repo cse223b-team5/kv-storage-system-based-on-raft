@@ -29,6 +29,11 @@ class ChaosMonkeyStub(object):
         request_serializer=chaosmonkey__pb2.Empty.SerializeToString,
         response_deserializer=chaosmonkey__pb2.ConnMatrix.FromString,
         )
+    self.KillANode = channel.unary_unary(
+        '/chaosmonkey.ChaosMonkey/KillANode',
+        request_serializer=chaosmonkey__pb2.KillANodeRequest.SerializeToString,
+        response_deserializer=chaosmonkey__pb2.Status.FromString,
+        )
 
 
 class ChaosMonkeyServicer(object):
@@ -56,6 +61,13 @@ class ChaosMonkeyServicer(object):
     context.set_details('Method not implemented!')
     raise NotImplementedError('Method not implemented!')
 
+  def KillANode(self, request, context):
+    # missing associated documentation comment in .proto file
+    pass
+    context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+    context.set_details('Method not implemented!')
+    raise NotImplementedError('Method not implemented!')
+
 
 def add_ChaosMonkeyServicer_to_server(servicer, server):
   rpc_method_handlers = {
@@ -73,6 +85,11 @@ def add_ChaosMonkeyServicer_to_server(servicer, server):
           servicer.GetMatrix,
           request_deserializer=chaosmonkey__pb2.Empty.FromString,
           response_serializer=chaosmonkey__pb2.ConnMatrix.SerializeToString,
+      ),
+      'KillANode': grpc.unary_unary_rpc_method_handler(
+          servicer.KillANode,
+          request_deserializer=chaosmonkey__pb2.KillANodeRequest.FromString,
+          response_serializer=chaosmonkey__pb2.Status.SerializeToString,
       ),
   }
   generic_handler = grpc.method_handlers_generic_handler(

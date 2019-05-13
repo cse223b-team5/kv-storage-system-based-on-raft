@@ -1,7 +1,7 @@
 servers: ["localhost"]
-num_of_nodes_in_each_aws: 10
+num_of_nodes_in_each_aws: 5
 port_start: 5001
 heartbeat_timeout: 0.5
 election_timeout_start: 2
-election_timeout_end: 3
+election_timeout_end: 4
 rpc_timeout: 0.5

@@ -39,10 +39,10 @@ class ChaosMonkey():
                 response = stub.UpdateValue(chaosmonkey_pb2.MatValue(row=int(row), col=int(col), val=float(val)))
                 # print('Response from port' + str(port) + ":" + str(response.ret))
 
-    def get_current_connMatrix(self):
+    def get_current_connMatrix(self, node_index):
         # return if_succeed, matrix
         #   if_succeed: 0 for succeeded, 1 for failed
-        ip, port = self.configs['nodes'][0]
+        ip, port = self.configs['nodes'][node_index]
         with grpc.insecure_channel(ip + ':' + port) as channel:
             stub = chaosmonkey_pb2_grpc.ChaosMonkeyStub(channel)
             try:
@@ -63,9 +63,19 @@ class ChaosMonkey():
         if node_id < 0 or node_id >= len(self.configs['nodes']):
             print('Invalid node_id.')
             return 1
-        for id in range(len(self.configs['nodes'])):
-            self.editMatrix(id, node_id, 1.0)
-            self.editMatrix(node_id, id, 1.0)
+        # for id in range(len(self.configs['nodes'])):
+        #     self.editMatrix(id, node_id, 1.0)
+        #     self.editMatrix(node_id, id, 1.0)
+
+        all_correct = True
+        for ip, port in self.configs['nodes']:
+            with grpc.insecure_channel(ip + ':' + port) as channel:
+                stub = chaosmonkey_pb2_grpc.ChaosMonkeyStub(channel)
+                response = stub.KillANode(chaosmonkey_pb2.KillANodeRequest(node_index=node_id))
+                if response.ret == 1:
+                    all_correct = False
+        if not all_correct:
+            print('Kill node failed!')
         return 0
 
     def kill_a_node_randomly(self):
@@ -91,6 +101,19 @@ class ChaosMonkey():
             self.editMatrix(node_id, id, 0.0)
         return 0
 
+    # def partition_network(self, num_of_nodes_with_leader):
+    #     # make the first num_of_nodes_with_leader nodes(or num_of_nodes_with_leader - 1) in the same partition as the leader
+    #     all_correct = True
+    #     for ip, port in self.configs['nodes']:
+    #         with grpc.insecure_channel(ip + ':' + port) as channel:
+    #             stub = chaosmonkey_pb2_grpc.ChaosMonkeyStub(channel)
+    #             response = stub.Partition(chaosmonkey_pb2.PartitionRequest(num_of_nodes_with_leader = num_of_nodes_with_leader))
+    #             if response.ret == 1:
+    #                 all_correct = False
+    #     if not all_correct:
+    #         return 1
+    #     return 0
+
 
 if __name__ == '__main__':
     logging.basicConfig()
@@ -107,7 +130,10 @@ if __name__ == '__main__':
         val = sys.argv[5]
         chaosmonkey.editMatrix(row, col, val)
     elif operation == 'get':
-        ret = chaosmonkey.get_current_connMatrix()
+        node_index = 0
+        if len(sys.argv) == 4:
+            node_index = int(sys.argv[3])
+        ret = chaosmonkey.get_current_connMatrix(node_index)
         if ret[0] == 1:
             print('Failed!')
         else:
@@ -122,6 +148,13 @@ if __name__ == '__main__':
             print('Success!')
         else:
             print('Failed!')
+    # elif operation == 'partition':
+    #     num_of_nodes_with_leader = sys.argv[3]
+    #     ret = chaosmonkey.partition_network(num_of_nodes_with_leader)
+    #     if ret == 0:
+    #         print('Partition Success!')
+    #     else:
+    #         print('Partition Failed!')
     else:
         print('Invalid opeartion')
 
