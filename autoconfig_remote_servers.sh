@@ -22,7 +22,7 @@ start_one_server(){
 
 		spawn ssh -i cse223b-19sp-j4lu.pem ec2-user@$ip
 
-		sleep 200
+		sleep 20
 
 		send \"sudo yum -y install git\r\"
 		sleep 5
@@ -44,33 +44,21 @@ start_one_server(){
 		sleep 2
 		send \"sudo python3 -m pip install --upgrade pip\r\"
 		sleep 15
-		send \"sudo python3 -m pip install grpcio\r\"
+		send \"sudo python3 -m pip install grpcio --upgrade\r\"
 		sleep 3
 		send \"sudo python3 -m pip install grpcio-tools\r\"
+                send \"exit\r\" 
+                expect eof 
+              
+                spawn scp -i cse223b-19sp-j4lu.pem config.txt ec2-user@$ip:kv-storage-system-based-on-raft/
+                sleep 3
 
-		
-		send \"python3 server.py config.txt $ip 5001 &\r\"
-		send \"python3 server.py config.txt $ip 5002 &\r\"
-		send \"python3 server.py config.txt $ip 5003 &\r\"
-		send \"python3 server.py config.txt $ip 5004 &\r\"
-		send \"python3 server.py config.txt $ip 5005 &\r\"
-		send \"python3 server.py config.txt $ip 5006 &\r\"
-		send \"python3 server.py config.txt $ip 5007 &\r\"
-		send \"python3 server.py config.txt $ip 5008 &\r\"
-		send \"python3 server.py config.txt $ip 5009 &\r\"
-		send \"python3 server.py config.txt $ip 5010 &\r\"
+                spawn ssh -i cse223b-19sp-j4lu.pem ec2-user@$ip
+                sleep 20
 
-		set index 0
-		puts $index
-		puts $num_of_nodes_in_each_aws
-		while { $index<$num_of_nodes_in_each_aws } {
-			set port [expr $port_start + $index]
-			puts $port
-			send \"python3 server.py config.txt $ip $port &\r\"
-			incr index
-			sleep 1
-		}
-
+	        send \"python3 utils.py $ip\r\"
+		send \"sh start_server.sh\r\"
+                sleep 3
 		send \"exit\r\"
 
 		expect eof
