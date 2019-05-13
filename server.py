@@ -673,6 +673,9 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
 
     def ask_for_vote_to_all(self):
         # send RPC requests to all other nodes
+        if len(self.configs['nodes']) == 1:
+            self.convert_to_leader()
+
         for t in self.configs['nodes']:
             if t[0] == self.myIp and t[1] == self.myPort:
                 continue
