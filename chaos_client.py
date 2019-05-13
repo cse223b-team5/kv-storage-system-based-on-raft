@@ -12,6 +12,7 @@ import numpy as np
 class ChaosMonkey():
     def __init__(self, config_path):
         self.configs = load_config(config_path)
+        self.killed_nodes = set()
 
     def _upload_to_server(self, configs, matrix):
         # print('start uploading conn_matrix to other nodes')
@@ -82,11 +83,30 @@ class ChaosMonkey():
         # return if_succeed, node_killed
         #   if_succeed: 0 for succeeded, 1 for failed
         node_id = random.choice(range(len(self.configs['nodes'])))
+        while node_id in self.killed_nodes:
+            node_id = random.choice(range(len(self.configs['nodes'])))
         ret = self.kill_a_node(node_id)
+        self.killed_nodes.add(node_id)
         if ret == 0:
             return 0, node_id
         else:
             return 1, -1
+
+    def kill_k_nodes_randomly(self, k):
+        killed = set()
+        if_succeed = True
+        for _ in range(int(k)):
+            node_id = random.choice(range(len(self.configs['nodes'])))
+            while node_id in killed:
+                node_id = random.choice(range(len(self.configs['nodes'])))
+            killed.add(node_id)
+            ret = self.kill_a_node(node_id)
+            if ret != 0:
+                if_succeed = False
+        if if_succeed:
+            return 0
+        else:
+            return 1
 
     def revive_a_node(self, node_id):
         # return if_succeed

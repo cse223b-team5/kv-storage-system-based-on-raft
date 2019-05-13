@@ -1,5 +1,2 @@
 node_index_0, localhost, 5001
 node_index_1, localhost, 5002
-node_index_2, localhost, 5003
-node_index_3, localhost, 5004
-node_index_4, localhost, 5005
