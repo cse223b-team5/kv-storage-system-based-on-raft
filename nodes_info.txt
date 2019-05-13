@@ -1,2 +1,1 @@
 node_index_0, localhost, 5001
-node_index_1, localhost, 5002
