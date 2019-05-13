@@ -1,6 +1,8 @@
 #!/bin/bash 
 
-ips="ec2-34-218-222-160.us-west-2.compute.amazonaws.com ec2-34-217-105-63.us-west-2.compute.amazonaws.com ec2-34-217-113-33.us-west-2.compute.amazonaws.com ec2-34-216-220-150.us-west-2.compute.amazonaws.com ec2-54-202-138-67.us-west-2.compute.amazonaws.com ec2-54-185-243-252.us-west-2.compute.amazonaws.com ec2-34-222-62-168.us-west-2.compute.amazonaws.com ec2-54-190-60-161.us-west-2.compute.amazonaws.com"
+#ips="ec2-34-218-222-160.us-west-2.compute.amazonaws.com ec2-34-217-105-63.us-west-2.compute.amazonaws.com ec2-34-217-113-33.us-west-2.compute.amazonaws.com ec2-34-216-220-150.us-west-2.compute.amazonaws.com ec2-54-202-138-67.us-west-2.compute.amazonaws.com ec2-54-185-243-252.us-west-2.compute.amazonaws.com ec2-34-222-62-168.us-west-2.compute.amazonaws.com ec2-54-190-60-161.us-west-2.compute.amazonaws.com"
+
+ips="ec2-34-222-121-74.us-west-2.compute.amazonaws.com ec2-34-217-108-155.us-west-2.compute.amazonaws.com ec2-52-37-113-151.us-west-2.compute.amazonaws.com ec2-34-220-172-239.us-west-2.compute.amazonaws.com"
 
 start_one_server(){
 	ip=$1
@@ -45,7 +47,18 @@ start_one_server(){
 		send \"sudo python3 -m pip install grpcio\r\"
 		sleep 3
 		send \"sudo python3 -m pip install grpcio-tools\r\"
-		sleep 3
+
+		
+		send \"python3 server.py config.txt $ip 5001 &\r\"
+		send \"python3 server.py config.txt $ip 5002 &\r\"
+		send \"python3 server.py config.txt $ip 5003 &\r\"
+		send \"python3 server.py config.txt $ip 5004 &\r\"
+		send \"python3 server.py config.txt $ip 5005 &\r\"
+		send \"python3 server.py config.txt $ip 5006 &\r\"
+		send \"python3 server.py config.txt $ip 5007 &\r\"
+		send \"python3 server.py config.txt $ip 5008 &\r\"
+		send \"python3 server.py config.txt $ip 5009 &\r\"
+		send \"python3 server.py config.txt $ip 5010 &\r\"
 
 		set index 0
 		puts $index
@@ -86,6 +99,6 @@ done < config.txt
 
 for ip in $ips; do
 	echo "in for loop"
-	start_one_server $ip $port_start $num_of_nodes_in_each_aws 
-	#start_one_server $ip 5001 1 
+	#start_one_server $ip $port_start $num_of_nodes_in_each_aws 
+	start_one_server $ip 5001 1 
 done

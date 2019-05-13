@@ -39,6 +39,11 @@ class KeyValueStoreStub(object):
         request_serializer=storage__service__pb2.DEBUG_GetVariable_Resquest.SerializeToString,
         response_deserializer=storage__service__pb2.DEBUG_GetVariable_Response.FromString,
         )
+    self.Partition = channel.unary_unary(
+        '/kvstore.KeyValueStore/Partition',
+        request_serializer=storage__service__pb2.PartitionRequest.SerializeToString,
+        response_deserializer=storage__service__pb2.PartitionResponse.FromString,
+        )
 
 
 class KeyValueStoreServicer(object):
@@ -80,6 +85,13 @@ class KeyValueStoreServicer(object):
     context.set_details('Method not implemented!')
     raise NotImplementedError('Method not implemented!')
 
+  def Partition(self, request, context):
+    # missing associated documentation comment in .proto file
+    pass
+    context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+    context.set_details('Method not implemented!')
+    raise NotImplementedError('Method not implemented!')
+
 
 def add_KeyValueStoreServicer_to_server(servicer, server):
   rpc_method_handlers = {
@@ -107,6 +119,11 @@ def add_KeyValueStoreServicer_to_server(servicer, server):
           servicer.DEBUG_GetVariable,
           request_deserializer=storage__service__pb2.DEBUG_GetVariable_Resquest.FromString,
           response_serializer=storage__service__pb2.DEBUG_GetVariable_Response.SerializeToString,
+      ),
+      'Partition': grpc.unary_unary_rpc_method_handler(
+          servicer.Partition,
+          request_deserializer=storage__service__pb2.PartitionRequest.FromString,
+          response_serializer=storage__service__pb2.PartitionResponse.SerializeToString,
       ),
   }
   generic_handler = grpc.method_handlers_generic_handler(
