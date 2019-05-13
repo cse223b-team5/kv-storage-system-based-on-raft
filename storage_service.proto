@@ -8,6 +8,12 @@ service KeyValueStore {
     rpc AppendEntries(AppendEntriesRequest) returns (AppendEntriesResponse) {}
     rpc RequestVote(RequestVoteRequest) returns (RequestVoteResponse) {}
     rpc DEBUG_GetVariable(DEBUG_GetVariable_Resquest) returns (DEBUG_GetVariable_Response) {}
+    rpc Partition(PartitionRequest) returns (PartitionResponse) {}
+}
+
+enum StatusCode {
+    OK = 0;
+    ERROR = 1;
 }
 
 message GetRequest {
@@ -75,6 +81,14 @@ message DEBUG_GetVariable_Resquest {
 
 message DEBUG_GetVariable_Response {
     string value = 1;
+}
+
+message PartitionRequest {
+    int32 num_of_nodes_with_leader = 1;
+}
+
+message PartitionResponse {
+    StatusCode ret = 1;
 }
 
 message Empty {

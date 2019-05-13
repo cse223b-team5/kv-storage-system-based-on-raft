@@ -6,9 +6,10 @@ from client import Client
 from utils import load_config
 from chaos_client import ChaosMonkey
 
+
 PRINT_RESULT = False
 
-NO_of_CONCURRENCY = 100
+NO_of_CONCURRENCY = 5
 TIME_of_TEST = 5  # s
 CONCURRENT_TYPES = {0: "concurrent_put", 1:"concurrent_get",
                     2: "concurrent_put_get_orderly", 3: "current_put_get_by_ratio"}
@@ -315,7 +316,15 @@ def start_static_test():
 
 
 def start_dynamic_test():
-    pass
+    # dynamic concurrent put test
+    dynamic_put_ct = ConcurrentTester(1, 0, 10, 5)
+    dynamic_put_ct.test()
+
+    # dynamic concurrent get test
+
+    # dynamic concurrent_put_get_orderly
+
+    # dynamic concurrent_put_get_by_ratio
 
 
 

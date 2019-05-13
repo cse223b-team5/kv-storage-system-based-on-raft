@@ -152,6 +152,18 @@ class Client:
             leader_index += 1
         return leader_index, self.leader_ip, self.leader_port
 
+    def partition_network(self, num_of_nodes_with_leader):
+        # make the first num_of_nodes_with_leader nodes(or num_of_nodes_with_leader - 1) in the same partition as the leader
+        all_correct = True
+        for ip, port in self.configs['nodes']:
+            with grpc.insecure_channel(ip + ':' + port) as channel:
+                stub = storage_service_pb2_grpc.KeyValueStoreStub(channel)
+                response = stub.Partition(storage_service_pb2.PartitionRequest(num_of_nodes_with_leader = num_of_nodes_with_leader))
+                if response.ret == 1:
+                    all_correct = False
+        if not all_correct:
+            return 1
+        return 0
 
 if __name__ == '__main__':
     logging.basicConfig()
@@ -186,5 +198,12 @@ if __name__ == '__main__':
             client.debug_get_variable(variable, ip, port)
         else:
             client.debug_get_variable(variable)
+    elif operation == 'partition':
+        num_of_nodes_with_leader = int(sys.argv[3])
+        ret = client.partition_network(num_of_nodes_with_leader)
+        if ret == 0:
+            print('Partition Success!')
+        else:
+            print('Partition Failed!')
     else:
         print("Invalid operation")
