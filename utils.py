@@ -74,7 +74,7 @@ def init_start_server(local_ip):
     for ip, port in configs["nodes"]:
        nodes.append("node_index_{}, {}, {}".format(i, ip, port))
        if ip == local_ip:
-           start_server_commands.append("python3 server.py config.txt {} {} &".format(ip, port))
+           start_server_commands.append("nohup python3 server.py config.txt {} {} &".format(ip, port)) 
        i += 1 
     with open("nodes_info.txt", 'w') as f:
         f.writelines("\n".join(nodes))
