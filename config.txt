@@ -1,5 +1,5 @@
 servers: ["localhost"]
-num_of_nodes_in_each_aws: 15
+num_of_nodes_in_each_aws: 2
 port_start: 5001
 heartbeat_timeout: 0.5
 election_timeout_start: 2

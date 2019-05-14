@@ -52,6 +52,10 @@ def network(func):
         else:
             # if random.random() < float(conn_mat[obj.node_index][sender_index]):
             #     time.sleep(1)
+
+            # add delay for exp3.4
+            # time.sleep(0.0)
+
             return func(obj, request, context)
     return wrapper_network
 
@@ -289,7 +293,7 @@ class StorageServer(storage_service_pb2_grpc.KeyValueStoreServicer):
         # no need to sync entries, ensure own leadership
 
         hb_success_error_cnt = list()
-        hb_success_error_cnt.append(0) # heartbeat successfully
+        hb_success_error_cnt.append(1) # heartbeat successfully
         hb_success_error_cnt.append(0) # heartbeat unsuccessfully
 
         hb_success_error_lock = threading.Lock()
