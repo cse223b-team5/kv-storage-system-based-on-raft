@@ -57,6 +57,9 @@ start_one_server(){
 		send \"sudo python3 -m pip install grpcio --upgrade\r\"
 		sleep 3
 		send \"sudo python3 -m pip install grpcio-tools\r\"
+                sleep 2
+                send \"sudo python3 -m pip install numpy\r\"
+                sleep 2
                 send \"exit\r\" 
                 expect eof 
               
