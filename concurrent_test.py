@@ -327,7 +327,6 @@ def start_dynamic_test():
     # dynamic concurrent_put_get_by_ratio
 
 
-
 if __name__ == '__main__':
     test_type = sys.argv[1]
     if test_type == 'static':

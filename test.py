@@ -357,6 +357,61 @@ def exp5_kill_k_nodes(number_of_nodes_to_kill=1):
     return elapsed_time
 
 
+def generate_nKB_string(nKB):
+    random_str = ''
+    base_str = 'ABCDEFGHIGKLMNOPQRSTUVWXYZabcdefghigklmnopqrstuvwxyz0123456789'
+
+    numOfChars = int(nKB * 1024 - 49)
+    for i in range(numOfChars):
+        random_str += base_str[random.randint(0, len(base_str) - 1)]
+    return random_str
+
+
+def start_exp4(number_of_operations):
+    l = [0.05, 0.1, 0.5, 1, 2, 4, 8, 16, 32]
+
+    for str_size in l:
+        print('Value size: {}KB.'.format(str_size))
+        # put
+        for _ in range(number_of_operations):
+            key = random.randint(0, 99999)
+            value = generate_nKB_string(str_size)
+            put_records[key] = value
+        put_failed_cnt = 0
+        duration = 0
+        for key in put_records:
+            t1 = time.time()
+            ret = client.put(key, put_records[key])
+            duration += (time.time() - t1)
+            if ret != 0:
+                put_failed_cnt += 0
+            else:
+                keys.append(key)
+                # only keys in keys[] are successfully uploaded to servers
+        duration *= 1000.0
+        print('Put {} k/vs.'.format(number_of_operations))
+        print('Elapsed time: {}ms.'.format(round(duration, 2)))
+        print('Average time for one request: {}ms.'.format(round(duration/number_of_operations, 2)))
+        print('{}/{} requests succeeded.'.format(number_of_operations-put_failed_cnt, number_of_operations))
+        print('---------------------------------------------------------------------')
+        # get
+        duration = 0
+        get_failed_cnt = 0
+        for _ in range(number_of_operations):
+            key = get_a_random_key()
+            t1 = time.time()
+            ret = client.get(key)
+            duration += (time.time() - t1)
+            if ret[0] != 0 or ret[1] != put_records[key]:
+                get_failed_cnt += 1
+        duration *= 1000.0
+        print('Get {} k/vs.'.format(number_of_operations))
+        print('Elapsed time: {}ms.'.format(round(duration, 2)))
+        print('Average time for one request: {}ms.'.format(round(duration / number_of_operations, 2)))
+        print('{}/{} requests succeeded.'.format(number_of_operations - put_failed_cnt, NO_of_PUTS))
+        print('======================================================================')
+
+
 if __name__ == '__main__':
     test_type = sys.argv[1]
     if test_type == 'static':
@@ -368,6 +423,11 @@ if __name__ == '__main__':
         if len(sys.argv) > 2:
             number_of_nodes = sys.argv[2]
         start_exp5(number_of_nodes)
+    elif test_type == 'exp4':
+        number_of_operations = 10
+        if len(sys.argv) > 2:
+            number_of_operations = int(sys.argv[2])
+        start_exp4(number_of_operations)
     else:
         print("Invalid operation")
 

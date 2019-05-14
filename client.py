@@ -165,6 +165,7 @@ class Client:
             return 1
         return 0
 
+
 if __name__ == '__main__':
     logging.basicConfig()
     config_path = sys.argv[1]
